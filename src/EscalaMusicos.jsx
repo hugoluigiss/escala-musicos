@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 // ─── DATA ───────────────────────────────────────────────────────────────────
 const MUSICIANS = [
-  { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true },
+  { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
   { id: "asafe", name: "Asafe", short: "Asafe", roles: ["teclado","violao","baixo","bateria"], coupleId: "jokasta" },
   { id: "jokasta", name: "Jokasta", short: "Jokasta", roles: ["vocal_principal","vocal_back"], coupleId: "asafe" },
   { id: "matheu", name: "Matheu Emanuel", short: "Matheu", roles: ["vocal_principal","vocal_back","bateria"] },
-  { id: "leandro", name: "Leandro Guimarães", short: "Leandro", roles: ["vocal_principal","vocal_back","violao","baixo"], coupleId: "aline", canDoubleVocalViolao: true },
+  { id: "leandro", name: "Leandro Guimarães", short: "Leandro", roles: ["vocal_principal","vocal_back","violao","baixo"], canDoubleVocalViolao: true, coupleId: "aline" },
   { id: "aline", name: "Aline Guimarães", short: "Aline", roles: ["vocal_principal","vocal_back"], coupleId: "leandro" },
   { id: "marcus", name: "Marcus", short: "Marcus", roles: ["guitarra"] },
   { id: "wendell", name: "Wendell", short: "Wendell", roles: ["violao"] },
@@ -14,17 +14,32 @@ const MUSICIANS = [
   { id: "clivison", name: "Clivison", short: "Clivison", roles: ["vocal_principal","vocal_back"] },
   { id: "madalena", name: "Madalena", short: "Madalena", roles: ["vocal_principal","vocal_back"], alternating: true },
 ];
+// ─── VOCALIST COLORS ────────────────────────────────────────────────────────
+const VOCALIST_COLORS = {
+  hugo:     { bg: "rgba(232,168,56,0.20)",  border: "rgba(232,168,56,0.45)",  text: "#e8a838", tag: "#e8a838" },
+  jokasta:  { bg: "rgba(168,130,255,0.20)", border: "rgba(168,130,255,0.45)", text: "#a882ff", tag: "#a882ff" },
+  matheu:   { bg: "rgba(91,200,175,0.20)",  border: "rgba(91,200,175,0.45)",  text: "#5bc8af", tag: "#5bc8af" },
+  leandro:  { bg: "rgba(105,180,255,0.20)", border: "rgba(105,180,255,0.45)", text: "#69b4ff", tag: "#69b4ff" },
+  aline:    { bg: "rgba(255,130,180,0.20)", border: "rgba(255,130,180,0.45)", text: "#ff82b4", tag: "#ff82b4" },
+  ana:      { bg: "rgba(255,200,100,0.20)", border: "rgba(255,200,100,0.45)", text: "#ffc864", tag: "#ffc864" },
+  clivison: { bg: "rgba(152,217,130,0.20)", border: "rgba(152,217,130,0.45)", text: "#98d982", tag: "#98d982" },
+  madalena: { bg: "rgba(255,140,105,0.20)", border: "rgba(255,140,105,0.45)", text: "#ff8c69", tag: "#ff8c69" },
+};
+const DEFAULT_VOCALIST_COLOR = { bg: "rgba(201,169,110,0.15)", border: "rgba(201,169,110,0.3)", text: "#c9a96e", tag: "#c9a96e" };
+function getVocalistColor(id) { return VOCALIST_COLORS[id] || DEFAULT_VOCALIST_COLOR; }
+
 const LEAD_VOCALISTS = ["hugo","jokasta","matheu","leandro","aline","ana","clivison","madalena"];
 const POSITIONS = [
-  { id: "vocal_principal", label: "Vocal Principal", count: 1, icon: "🎤", color: "#e8a838" },
-  { id: "vocal_back", label: "Back Vocal", count: 3, icon: "🎵", color: "#9b8aff" },
-  { id: "teclado", label: "Teclado", count: 1, icon: "🎹", color: "#5bc8af" },
-  { id: "violao", label: "Violão", count: 1, icon: "🎸", color: "#ff8c69" },
-  { id: "baixo", label: "Baixo", count: 1, icon: "🎼", color: "#69b4ff" },
-  { id: "guitarra", label: "Guitarra", count: 1, icon: "⚡", color: "#ff69b4" },
-  { id: "bateria", label: "Bateria", count: 1, icon: "🥁", color: "#98d982" },
+  { id: "vocal_principal", label: "Vocal Principal", count: 1, icon: "🎤", color: "#e8a838", required: true },
+  { id: "vocal_back", label: "Back Vocal", count: 3, icon: "🎵", color: "#9b8aff", required: false, minCount: 2 },
+  { id: "teclado", label: "Teclado", count: 1, icon: "🎹", color: "#5bc8af", required: true },
+  { id: "violao", label: "Violão", count: 1, icon: "🎸", color: "#ff8c69", required: false },
+  { id: "baixo", label: "Baixo", count: 1, icon: "🎼", color: "#69b4ff", required: false },
+  { id: "guitarra", label: "Guitarra", count: 1, icon: "⚡", color: "#ff69b4", required: false },
+  { id: "bateria", label: "Bateria", count: 1, icon: "🥁", color: "#98d982", required: true },
 ];
 const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+// ─── HELPERS ────────────────────────────────────────────────────────────────
 function getSundays(year, month) {
   const sundays = [];
   const d = new Date(year, month, 1);
@@ -34,6 +49,7 @@ function getSundays(year, month) {
 }
 function fmt(date) { return `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`; }
 function getMusicianById(id) { return MUSICIANS.find(m => m.id === id); }
+// ─── SMART SCHEDULER ────────────────────────────────────────────────────────
 function generateSchedule(sundays, leadRotation) {
   const totalSundays = sundays.length;
   const schedule = {};
@@ -44,6 +60,22 @@ function generateSchedule(sundays, leadRotation) {
   for (let si = 0; si < totalSundays; si++) {
     const dayAssignments = {};
     const usedThisSunday = new Set();
+    function canSchedule(musicianId, positionId) {
+      const m = getMusicianById(musicianId);
+      if (!m) return false;
+      if (usedThisSunday.has(musicianId)) return false;
+      if (!m.roles.includes(positionId)) return false;
+      if (m.maxPerMonth && musicianSundayCount[musicianId] >= m.maxPerMonth) return false;
+      if (m.alternating) {
+        const lastOn = Object.keys(schedule).filter(k => {
+          const [s] = k.split("-");
+          return parseInt(s) === si - 1 && schedule[k] === musicianId;
+        });
+        if (lastOn.length > 0) return false;
+      }
+      return true;
+    }
+    // ── STEP 1: Assign Lead Vocalist (rotation) ──
     let leadAssigned = null;
     for (let attempt = 0; attempt < leadQueue.length; attempt++) {
       const candidate = leadQueue[attempt];
@@ -78,6 +110,11 @@ function generateSchedule(sundays, leadRotation) {
       musicianSundayCount[leadAssigned]++;
       dayAssignments["vocal_principal"] = [leadAssigned];
       const leadM = getMusicianById(leadAssigned);
+      // ── RULE: Hugo vocal → Hugo violão, Leandro vocal → Leandro violão ──
+      if ((leadAssigned === "hugo" || leadAssigned === "leandro") && leadM?.canDoubleVocalViolao) {
+        schedule[`${si}-violao-0`] = leadAssigned;
+        // don't add to usedThisSunday again — they can double
+      }
       if (leadM?.coupleId) {
         const partner = getMusicianById(leadM.coupleId);
         if (partner && partner.roles.includes("vocal_back")) {
@@ -89,6 +126,7 @@ function generateSchedule(sundays, leadRotation) {
         }
       }
     }
+    // ── STEP 2: Back Vocals (3 slots, min 2) ──
     const backVocalCandidates = MUSICIANS.filter(m =>
       m.roles.includes("vocal_back") &&
       !usedThisSunday.has(m.id) &&
@@ -136,32 +174,30 @@ function generateSchedule(sundays, leadRotation) {
         }
       }
     });
-    const instrumentPositions = ["teclado","violao","baixo","guitarra","bateria"];
+    // ── STEP 3: Instruments ──
+    // Required: teclado, bateria (always fill)
+    // Optional: violao (may already be assigned by lead rule), baixo, guitarra (can be empty)
+    const instrumentPositions = ["teclado","bateria","violao","baixo","guitarra"];
     for (const posId of instrumentPositions) {
+      // Skip violão if already assigned (Hugo/Leandro lead rule)
+      if (posId === "violao" && schedule[`${si}-violao-0`]) continue;
       const candidates = MUSICIANS.filter(m =>
         m.roles.includes(posId) &&
         !usedThisSunday.has(m.id) &&
         !(m.maxPerMonth && musicianSundayCount[m.id] >= m.maxPerMonth)
       ).sort((a, b) => musicianSundayCount[a.id] - musicianSundayCount[b.id]);
       if (candidates.length > 0) {
-        const doubler = candidates.find(c => {
-          const m = getMusicianById(c.id);
-          return m?.canDoubleVocalViolao && posId === "violao" && usedThisSunday.has(c.id) &&
-            (schedule[`${si}-vocal_principal-0`] === c.id || existingBack.includes(c.id));
-        });
-        if (doubler && posId === "violao") {
-          schedule[`${si}-${posId}-0`] = doubler.id;
-          musicianSundayCount[doubler.id]++;
-        } else {
-          schedule[`${si}-${posId}-0`] = candidates[0].id;
-          usedThisSunday.add(candidates[0].id);
-          musicianSundayCount[candidates[0].id]++;
-        }
+        const chosen = candidates[0].id;
+        schedule[`${si}-${posId}-0`] = chosen;
+        usedThisSunday.add(chosen);
+        musicianSundayCount[chosen]++;
       }
+      // If no candidate and position is optional (baixo, guitarra, violão), leave empty — that's OK
     }
   }
   return { schedule, newLeadQueue: leadQueue };
 }
+// ─── CONFLICT ANALYZER ──────────────────────────────────────────────────────
 function analyzeConflicts(schedule, sundays, leadRotationHistory) {
   const conflicts = [];
   const totalSundays = sundays.length;
@@ -174,10 +210,37 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory) {
     counts[val]++;
     if (!sundaysByMusician[val].includes(si)) sundaysByMusician[val].push(si);
   });
+  // Check required positions
+  for (let si = 0; si < totalSundays; si++) {
+    if (!schedule[`${si}-vocal_principal-0`]) {
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Vocal Principal (obrigatório)` });
+    }
+    if (!schedule[`${si}-teclado-0`]) {
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Teclado (obrigatório)` });
+    }
+    if (!schedule[`${si}-bateria-0`]) {
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Bateria (obrigatório)` });
+    }
+    // Check minimum back vocals (2)
+    const backCount = [0,1,2].filter(s => schedule[`${si}-vocal_back-${s}`]).length;
+    if (backCount < 2) {
+      conflicts.push({ type: "low_back", severity: "warning", msg: `Domingo ${si+1}: apenas ${backCount} back vocal (mínimo recomendado: 2)` });
+    }
+    // Check Hugo/Leandro vocal → violão rule
+    const lead = schedule[`${si}-vocal_principal-0`];
+    if ((lead === "hugo" || lead === "leandro") && schedule[`${si}-violao-0`] !== lead) {
+      const m = getMusicianById(lead);
+      conflicts.push({ type: "vocal_violao", severity: "warning", msg: `Domingo ${si+1}: ${m?.name} é lead mas não está no violão` });
+    }
+    // Info: optional positions empty
+    if (!schedule[`${si}-baixo-0`]) {
+      // Not an error — just info (no conflict added)
+    }
+  }
   MUSICIANS.forEach(m => {
     const count = (sundaysByMusician[m.id] || []).length;
     const offWeeks = totalSundays - count;
-    if (offWeeks === 0 && totalSundays >= 4) {
+    if (offWeeks === 0 && totalSundays >= 4 && !m.noFolgaRequired) {
       conflicts.push({ type: "no_folga", severity: "error", msg: `${m.name} não tem nenhuma folga este mês` });
     }
     if (m.maxPerMonth && count > m.maxPerMonth) {
@@ -229,6 +292,7 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory) {
   }
   return conflicts;
 }
+// ─── MAIN COMPONENT ─────────────────────────────────────────────────────────
 export default function EscalaMusicos() {
   const today = new Date();
   const [month, setMonth] = useState(today.getMonth());
@@ -241,6 +305,7 @@ export default function EscalaMusicos() {
   const [loaded, setLoaded] = useState(false);
   const monthKey = `${year}-${month}`;
   const sundays = getSundays(year, month);
+  // ── Storage (localStorage) ──
   useEffect(() => {
     try {
       const s = localStorage.getItem("escala_schedules");
@@ -280,12 +345,23 @@ export default function EscalaMusicos() {
   function getAssigned(si, posId, slot) { return schedule[`${si}-${posId}-${slot}`] || null; }
   function assign(si, posId, slot, musicianId) {
     const updated = { ...schedule, [`${si}-${posId}-${slot}`]: musicianId };
+    // Auto-assign violão when Hugo or Leandro become lead
+    if (posId === "vocal_principal" && (musicianId === "hugo" || musicianId === "leandro")) {
+      updated[`${si}-violao-0`] = musicianId;
+    }
     setSchedule(updated);
     setActiveCell(null);
   }
   function clearCell(si, posId, slot) {
     const updated = { ...schedule };
+    const wasLead = posId === "vocal_principal" ? updated[`${si}-vocal_principal-0`] : null;
     delete updated[`${si}-${posId}-${slot}`];
+    // If clearing lead vocal for Hugo/Leandro, also clear their violão
+    if (posId === "vocal_principal" && (wasLead === "hugo" || wasLead === "leandro")) {
+      if (updated[`${si}-violao-0`] === wasLead) {
+        delete updated[`${si}-violao-0`];
+      }
+    }
     setSchedule(updated);
   }
   function autoGenerate() {
@@ -325,6 +401,7 @@ export default function EscalaMusicos() {
     <div style={{ fontFamily:"'Georgia', serif", minHeight:"100vh", background:"#0d0b1e", color:"#f0e6d3" }}>
       <div style={{ position:"fixed", inset:0, backgroundImage:"radial-gradient(ellipse at 20% 20%, rgba(201,169,110,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(100,80,180,0.1) 0%, transparent 60%)", pointerEvents:"none" }} />
       <div style={{ position:"relative", maxWidth:"1100px", margin:"0 auto", padding:"24px 16px" }}>
+        {/* ── HEADER ── */}
         <div style={{ textAlign:"center", marginBottom:"28px" }}>
           <div style={{ fontSize:"10px", letterSpacing:"8px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"6px" }}>Ministério de Louvor</div>
           <h1 style={{ fontSize:"clamp(26px,5vw,40px)", fontWeight:"900", margin:"0 0 4px", color:"#f0e6d3", letterSpacing:"-1px" }}>
@@ -340,6 +417,22 @@ export default function EscalaMusicos() {
             <button onClick={nextMonth} style={navBtnStyle}>›</button>
           </div>
         </div>
+        {/* ── VOCALIST COLOR LEGEND ── */}
+        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center", marginBottom:"16px" }}>
+          {LEAD_VOCALISTS.map(id => {
+            const m = getMusicianById(id);
+            const vc = getVocalistColor(id);
+            return (
+              <div key={id} style={{
+                padding:"4px 12px", borderRadius:"16px", fontSize:"11px", fontWeight:"600",
+                background: vc.bg, border: `1px solid ${vc.border}`, color: vc.text
+              }}>
+                {m?.short}
+              </div>
+            );
+          })}
+        </div>
+        {/* ── ACTION BAR ── */}
         <div style={{ display:"flex", gap:"10px", flexWrap:"wrap", justifyContent:"center", marginBottom:"24px" }}>
           <button onClick={autoGenerate} disabled={generating} style={{
             ...actionBtnStyle, background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e", fontWeight:"700"
@@ -352,6 +445,7 @@ export default function EscalaMusicos() {
             </button>
           )}
         </div>
+        {/* ── CONFLICT BANNER ── */}
         {conflicts.length > 0 && (
           <div style={{ marginBottom:"20px", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(220,80,80,0.3)" }}>
             {errors.map((c,i) => (
@@ -371,6 +465,7 @@ export default function EscalaMusicos() {
             ✅ Nenhum conflito encontrado — escala válida!
           </div>
         )}
+        {/* ── TABS ── */}
         <div style={{ display:"flex", gap:"4px", marginBottom:"20px", background:"rgba(255,255,255,0.04)", borderRadius:"10px", padding:"4px" }}>
           {[["escala","📋 Escala"],["resumo","📊 Resumo"],["conflitos",`⚠️ Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]].map(([t,label]) => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
@@ -381,6 +476,7 @@ export default function EscalaMusicos() {
             }}>{label}</button>
           ))}
         </div>
+        {/* ── TAB: ESCALA ── */}
         {activeTab === "escala" && (
           <div style={{ overflowX:"auto", marginBottom:"24px" }}>
             {!hasData && (
@@ -391,12 +487,20 @@ export default function EscalaMusicos() {
             {hasData && (
               <div style={{ display:"grid", gridTemplateColumns:`160px repeat(${sundays.length},1fr)`, gap:"3px", minWidth:"500px" }}>
                 <div style={headerCellStyle} />
-                {sundays.map((s,i) => (
-                  <div key={i} style={{ ...headerCellStyle, textAlign:"center", borderRadius: i===0?"8px 0 0 0":i===sundays.length-1?"0 8px 0 0":"0" }}>
-                    <div style={{ fontSize:"10px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase" }}>Dom {i+1}</div>
-                    <div style={{ fontSize:"17px", fontWeight:"700" }}>{fmt(s)}</div>
-                  </div>
-                ))}
+                {sundays.map((s,i) => {
+                  const leadId = schedule[`${i}-vocal_principal-0`];
+                  const vc = leadId ? getVocalistColor(leadId) : null;
+                  return (
+                    <div key={i} style={{
+                      ...headerCellStyle, textAlign:"center",
+                      borderRadius: i===0?"8px 0 0 0":i===sundays.length-1?"0 8px 0 0":"0",
+                      borderBottom: vc ? `3px solid ${vc.tag}` : "3px solid transparent"
+                    }}>
+                      <div style={{ fontSize:"10px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase" }}>Dom {i+1}</div>
+                      <div style={{ fontSize:"17px", fontWeight:"700" }}>{fmt(s)}</div>
+                    </div>
+                  );
+                })}
                 {POSITIONS.map((pos, posIdx) => {
                   const slots = Array.from({length:pos.count},(_,i)=>i);
                   return slots.map((slot, slotIdx) => {
@@ -409,7 +513,12 @@ export default function EscalaMusicos() {
                       }}>
                         <span style={{ fontSize:"18px" }}>{pos.icon}</span>
                         <div>
-                          <div style={{ fontSize:"12px", fontWeight:"600", color:pos.color }}>{pos.label}</div>
+                          <div style={{ fontSize:"12px", fontWeight:"600", color:pos.color }}>
+                            {pos.label}
+                            {!pos.required && pos.id !== "vocal_back" && (
+                              <span style={{ fontSize:"9px", color:"rgba(255,255,255,0.3)", marginLeft:"4px" }}>opcional</span>
+                            )}
+                          </div>
                           {pos.count > 1 && <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)" }}>#{slot+1}</div>}
                         </div>
                       </div>,
@@ -418,18 +527,26 @@ export default function EscalaMusicos() {
                         const musician = assigned ? getMusicianById(assigned) : null;
                         const cellKey = `${si}-${pos.id}-${slot}`;
                         const isActive = activeCell === cellKey;
+                        const isVocal = pos.id === "vocal_principal" || pos.id === "vocal_back";
                         const isLead = pos.id === "vocal_principal";
+                        // Use vocalist color for vocal positions
+                        const vc = isVocal && assigned ? getVocalistColor(assigned) : null;
+                        const cellBg = vc ? vc.bg : (musician ? `${pos.color}18` : "transparent");
+                        const cellTextColor = vc ? vc.text : (isLead ? "#e8a838" : pos.color);
+                        // Highlight Hugo/Leandro doubling on violão
+                        const isDoubling = pos.id === "violao" && assigned && (assigned === "hugo" || assigned === "leandro") && schedule[`${si}-vocal_principal-0`] === assigned;
                         return (
                           <div key={`cell-${cellKey}`} style={{ position:"relative", background:"rgba(255,255,255,0.02)", borderTop:slotIdx===0?"1px solid rgba(255,255,255,0.06)":"none" }}>
                             <button onClick={() => setActiveCell(isActive ? null : cellKey)} style={{
-                              width:"100%", minHeight:"50px", padding:"6px 4px", background: musician ? `${pos.color}18` : "transparent",
-                              border: isActive ? `1px solid ${pos.color}` : "1px solid transparent",
+                              width:"100%", minHeight:"50px", padding:"6px 4px", background: cellBg,
+                              border: isActive ? `1px solid ${vc ? vc.border : pos.color}` : (vc ? `1px solid ${vc.border}44` : "1px solid transparent"),
                               borderRadius:"4px", cursor:"pointer", color:"#f0e6d3", fontSize:"11px", textAlign:"center", fontFamily:"Georgia, serif", transition:"all 0.15s"
                             }}>
                               {musician ? (
                                 <div>
-                                  <div style={{ fontWeight:"700", color: isLead ? "#e8a838" : pos.color, fontSize:"12px" }}>{musician.short}</div>
-                                  {isLead && <div style={{ fontSize:"9px", color:"rgba(232,168,56,0.6)", letterSpacing:"1px" }}>LEAD</div>}
+                                  <div style={{ fontWeight:"700", color: cellTextColor, fontSize:"12px" }}>{musician.short}</div>
+                                  {isLead && <div style={{ fontSize:"9px", color: vc ? `${vc.text}99` : "rgba(232,168,56,0.6)", letterSpacing:"1px" }}>LEAD</div>}
+                                  {isDoubling && <div style={{ fontSize:"8px", color:"#ff8c69", letterSpacing:"0.5px", marginTop:"1px" }}>+ vocal</div>}
                                 </div>
                               ) : (
                                 <span style={{ color:"rgba(255,255,255,0.15)", fontSize:"20px" }}>+</span>
@@ -451,14 +568,18 @@ export default function EscalaMusicos() {
                                 {MUSICIANS.filter(m => m.roles.includes(pos.id)).map(m => {
                                   const suns = getMusicianSundays(m.id);
                                   const overLimit = m.maxPerMonth && suns.size >= m.maxPerMonth;
+                                  const mVc = isVocal ? getVocalistColor(m.id) : null;
                                   return (
                                     <button key={m.id} onClick={() => assign(si, pos.id, slot, m.id)} style={{
-                                      width:"100%", padding:"9px 14px", background: m.id===assigned?"rgba(201,169,110,0.15)":"transparent",
-                                      border:"none", borderBottom:"1px solid rgba(255,255,255,0.05)", color: overLimit?"#666":"#f0e6d3",
+                                      width:"100%", padding:"9px 14px", background: m.id===assigned ? (mVc ? mVc.bg : "rgba(201,169,110,0.15)") : "transparent",
+                                      border:"none", borderBottom:"1px solid rgba(255,255,255,0.05)", color: overLimit?"#666": (mVc ? mVc.text : "#f0e6d3"),
                                       cursor:"pointer", textAlign:"left", fontSize:"12px", display:"flex", justifyContent:"space-between",
                                       fontFamily:"Georgia, serif"
                                     }}>
-                                      <span>{m.name}</span>
+                                      <span style={{ display:"flex", alignItems:"center", gap:"6px" }}>
+                                        {mVc && <span style={{ width:"8px", height:"8px", borderRadius:"50%", background: mVc.tag, display:"inline-block" }} />}
+                                        {m.name}
+                                      </span>
                                       <span style={{ fontSize:"10px", color:"#c9a96e", opacity:0.6 }}>{suns.size}x</span>
                                     </button>
                                   );
@@ -475,6 +596,7 @@ export default function EscalaMusicos() {
             )}
           </div>
         )}
+        {/* ── TAB: RESUMO ── */}
         {activeTab === "resumo" && (
           <div>
             <div style={{ marginBottom:"20px", background:"rgba(232,168,56,0.08)", border:"1px solid rgba(232,168,56,0.2)", borderRadius:"12px", padding:"16px 20px" }}>
@@ -482,12 +604,13 @@ export default function EscalaMusicos() {
               <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
                 {leadRotation.slice(0,8).map((id,i) => {
                   const m = getMusicianById(id);
+                  const vc = getVocalistColor(id);
                   return (
                     <div key={`${id}-${i}`} style={{
                       padding:"6px 12px", borderRadius:"20px", fontSize:"12px",
-                      background: i===0?"rgba(232,168,56,0.3)":"rgba(255,255,255,0.06)",
-                      border: i===0?"1px solid rgba(232,168,56,0.5)":"1px solid rgba(255,255,255,0.1)",
-                      color: i===0?"#e8a838":"rgba(240,230,211,0.7)"
+                      background: i===0 ? vc.bg : "rgba(255,255,255,0.06)",
+                      border: i===0 ? `1px solid ${vc.border}` : "1px solid rgba(255,255,255,0.1)",
+                      color: i===0 ? vc.text : "rgba(240,230,211,0.7)"
                     }}>
                       {i===0 && "→ "}{m?.short}
                     </div>
@@ -505,14 +628,15 @@ export default function EscalaMusicos() {
                 {sundays.map((_,si) => {
                   const leadId = schedule[`${si}-vocal_principal-0`];
                   const m = leadId ? getMusicianById(leadId) : null;
+                  const vc = leadId ? getVocalistColor(leadId) : null;
                   return (
                     <div key={si} style={{ textAlign:"center" }}>
                       <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)", marginBottom:"4px" }}>Dom {si+1}</div>
                       <div style={{
                         padding:"8px 12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700",
-                        background: m ? "rgba(232,168,56,0.2)" : "rgba(255,255,255,0.04)",
-                        color: m ? "#e8a838" : "rgba(255,255,255,0.2)",
-                        border: m ? "1px solid rgba(232,168,56,0.3)" : "1px solid rgba(255,255,255,0.08)"
+                        background: vc ? vc.bg : "rgba(255,255,255,0.04)",
+                        color: vc ? vc.text : "rgba(255,255,255,0.2)",
+                        border: vc ? `1px solid ${vc.border}` : "1px solid rgba(255,255,255,0.08)"
                       }}>
                         {m ? m.short : "—"}
                       </div>
@@ -525,12 +649,16 @@ export default function EscalaMusicos() {
               {stats.map(m => {
                 const hasFolga = m.offWeeks >= 1;
                 const color = hasFolga ? "#5bc85b" : "#ff6060";
+                const vc = getVocalistColor(m.id);
+                const isVocalist = LEAD_VOCALISTS.includes(m.id);
                 return (
                   <div key={m.id} style={{
-                    background:"rgba(255,255,255,0.03)", border:`1px solid ${hasFolga?"rgba(91,200,91,0.2)":"rgba(255,96,96,0.2)"}`,
-                    borderRadius:"12px", padding:"14px"
+                    background:"rgba(255,255,255,0.03)",
+                    border: isVocalist ? `1px solid ${vc.border}` : `1px solid ${hasFolga?"rgba(91,200,91,0.2)":"rgba(255,96,96,0.2)"}`,
+                    borderRadius:"12px", padding:"14px",
+                    borderLeft: isVocalist ? `3px solid ${vc.tag}` : undefined
                   }}>
-                    <div style={{ fontSize:"13px", fontWeight:"700", color:"#f0e6d3", marginBottom:"2px" }}>{m.short}</div>
+                    <div style={{ fontSize:"13px", fontWeight:"700", color: isVocalist ? vc.text : "#f0e6d3", marginBottom:"2px" }}>{m.short}</div>
                     <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)", marginBottom:"10px" }}>
                       {m.name !== m.short ? m.name.replace(m.short,"").trim() : ""}
                       {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> • máx {m.maxPerMonth}x</span>}
@@ -538,20 +666,23 @@ export default function EscalaMusicos() {
                       {m.coupleId && <span style={{ color:"#aaa8ff" }}> • casal</span>}
                     </div>
                     <div style={{ display:"flex", gap:"4px", marginBottom:"8px" }}>
-                      {sundays.map((_,i) => (
-                        <div key={i} style={{
-                          width:"20px", height:"20px", borderRadius:"5px", fontSize:"9px", fontWeight:"700",
-                          background: isOnSunday(m.id,i) ? (schedule[`${i}-vocal_principal-0`]===m.id?"#e8a838":"#c9a96e") : "rgba(255,255,255,0.07)",
-                          color: isOnSunday(m.id,i) ? "#0d0b1e" : "rgba(255,255,255,0.25)",
-                          display:"flex", alignItems:"center", justifyContent:"center"
-                        }}>{schedule[`${i}-vocal_principal-0`]===m.id?"L":i+1}</div>
-                      ))}
+                      {sundays.map((_,i) => {
+                        const isLeadHere = schedule[`${i}-vocal_principal-0`] === m.id;
+                        return (
+                          <div key={i} style={{
+                            width:"20px", height:"20px", borderRadius:"5px", fontSize:"9px", fontWeight:"700",
+                            background: isOnSunday(m.id,i) ? (isLeadHere ? vc.tag : (isVocalist ? `${vc.tag}88` : "#c9a96e")) : "rgba(255,255,255,0.07)",
+                            color: isOnSunday(m.id,i) ? "#0d0b1e" : "rgba(255,255,255,0.25)",
+                            display:"flex", alignItems:"center", justifyContent:"center"
+                          }}>{isLeadHere ? "L" : i+1}</div>
+                        );
+                      })}
                     </div>
                     <div style={{ fontSize:"11px", color }}>
                       {m.count}x escalado • {m.offWeeks}x folga
                     </div>
                     {m.leadsThisMonth > 0 && (
-                      <div style={{ fontSize:"10px", color:"#e8a838", marginTop:"2px" }}>🎤 Lead {m.leadsThisMonth}x</div>
+                      <div style={{ fontSize:"10px", color: vc.tag, marginTop:"2px" }}>🎤 Lead {m.leadsThisMonth}x</div>
                     )}
                   </div>
                 );
@@ -559,6 +690,7 @@ export default function EscalaMusicos() {
             </div>
           </div>
         )}
+        {/* ── TAB: CONFLITOS ── */}
         {activeTab === "conflitos" && (
           <div>
             {conflicts.length === 0 ? (
@@ -591,12 +723,15 @@ export default function EscalaMusicos() {
             <div style={{ marginTop:"24px", background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"16px 20px" }}>
               <div style={{ fontSize:"11px", letterSpacing:"3px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>Regras do Sistema</div>
               {[
-                "Cada músico deve ter pelo menos 1 folga por mês",
+                "Cada músico deve ter pelo menos 1 folga por mês (exceto Hugo Luigi)",
                 "Ana Tiscianeli: máximo 1x por mês",
                 "Madalena: domingos alternados (1 sim, 1 não)",
                 "Casais Asafe/Jokasta e Leandro/Aline: sempre folga juntos",
                 "Lead Vocal: rotação completa antes de repetir",
-                "Hugo Luigi e Leandro podem acumular Vocal + Violão",
+                "Hugo e Leandro: quando vocal, automaticamente no violão",
+                "Teclado e Bateria: SEMPRE obrigatórios",
+                "Baixo, Guitarra e Violão: podem ficar vazios se necessário",
+                "Mínimo 2 back vocals por domingo",
               ].map((r,i) => (
                 <div key={i} style={{ padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.05)", fontSize:"12px", color:"rgba(240,230,211,0.6)", display:"flex", gap:"8px" }}>
                   <span style={{ color:"#c9a96e", fontSize:"14px" }}>✦</span>{r}
@@ -612,6 +747,7 @@ export default function EscalaMusicos() {
     </div>
   );
 }
+// ─── STYLE CONSTANTS ────────────────────────────────────────────────────────
 const navBtnStyle = {
   background:"rgba(201,169,110,0.12)", border:"1px solid rgba(201,169,110,0.25)",
   color:"#c9a96e", width:"38px", height:"38px", borderRadius:"50%",
