@@ -72,11 +72,44 @@ function getSundays(year, month) {
   return sundays;
 }
 function fmt(date) { return `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`; }
+function dateKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}-${String(date.getDate()).padStart(2,"0")}`;
+}
 
-// ─── SMART SCHEDULER v3 ────────────────────────────────────────────────────
+// ─── PREVIOUS MONTH STATS ─────────────────────────────────────────────────
+// Extracts participation counts from a previous month's schedule
+function getPrevMonthStats(prevSchedule, prevSundays, musicians) {
+  if (!prevSchedule || Object.keys(prevSchedule).length === 0) return null;
+  const total = prevSundays.length;
+  const counts = {};
+  const folgaCounts = {};
+  const lastLeadId = null;
+  musicians.forEach(m => { counts[m.id] = 0; folgaCounts[m.id] = 0; });
+  // Count participations
+  const sundaysByMusician = {};
+  musicians.forEach(m => { sundaysByMusician[m.id] = new Set(); });
+  Object.entries(prevSchedule).forEach(([key, val]) => {
+    const si = parseInt(key.split("-")[0]);
+    if (sundaysByMusician[val]) sundaysByMusician[val].add(si);
+  });
+  musicians.forEach(m => {
+    counts[m.id] = sundaysByMusician[m.id]?.size || 0;
+    folgaCounts[m.id] = total - (sundaysByMusician[m.id]?.size || 0);
+  });
+  // Get last lead of previous month
+  let lastLead = null;
+  for (let si = total - 1; si >= 0; si--) {
+    const lid = prevSchedule[`${si}-vocal_principal-0`];
+    if (lid) { lastLead = lid; break; }
+  }
+  return { counts, folgaCounts, lastLead, totalSundays: total };
+}
+
+// ─── SMART SCHEDULER v4 ────────────────────────────────────────────────────
 // Phase 1: Plan folgas (who is OFF each Sunday)
 // Phase 2: Assign positions from available musicians
-function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) {
+// Now accepts blockDates and prevMonthStats for continuity
+function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, blockDates, prevMonthStats) {
   const total = sundays.length;
   const schedule = {};
   const getM = (id) => musicians.find(m => m.id === id);
@@ -84,12 +117,25 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
   // ═══ PHASE 1: Plan availability per Sunday ═══
   const avail = Array.from({ length: total }, () => new Set(musicians.map(m => m.id)));
 
-  // 1a. Alternating musicians (e.g., Madalena): off every other Sunday
+  // 1a. BLOCK DATES — remove musicians on their blocked Sundays
+  if (blockDates && typeof blockDates === "object") {
+    for (let si = 0; si < total; si++) {
+      const dk = dateKey(sundays[si]);
+      musicians.forEach(m => {
+        const blocked = blockDates[m.id];
+        if (Array.isArray(blocked) && blocked.includes(dk)) {
+          avail[si].delete(m.id);
+        }
+      });
+    }
+  }
+
+  // 1b. Alternating musicians (e.g., Madalena): off every other Sunday
   musicians.filter(m => m.alternating).forEach(m => {
     for (let si = 1; si < total; si += 2) avail[si].delete(m.id);
   });
 
-  // 1b. maxPerMonth musicians (e.g., Ana: plays only 1 Sunday)
+  // 1c. maxPerMonth musicians (e.g., Ana: plays only 1 Sunday)
   musicians.filter(m => m.maxPerMonth).forEach(m => {
     const plays = new Set();
     for (let i = 0; i < Math.min(m.maxPerMonth, total); i++) {
@@ -100,7 +146,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
     }
   });
 
-  // 1c. Build couple/individual groups that need folga
+  // 1d. Build couple/individual groups that need folga
   const groups = [];
   const seen = new Set();
   musicians.forEach(m => {
@@ -122,21 +168,38 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
   groups.sort((a, b) => b.length - a.length);
 
   // Assign 1 folga per group, spreading across Sundays evenly
+  // Consider previous month: groups with more plays last month get priority folga on busier Sundays
   groups.forEach((group, gi) => {
-    // Find Sunday with fewest people off
+    // Skip groups that already have block-date absences this month
+    const hasBlockedSunday = group.some(id => {
+      for (let si = 0; si < total; si++) {
+        if (!avail[si].has(id)) return true;
+      }
+      return false;
+    });
+    if (hasBlockedSunday) return; // They already have forced absences
+
+    // Use previous month stats to influence folga assignment
     let bestSi = gi % total;
-    let bestOff = Infinity;
+    let bestScore = Infinity;
     for (let si = 0; si < total; si++) {
       const offCount = musicians.length - avail[si].size;
-      if (offCount < bestOff) {
-        bestOff = offCount;
+      // If prev month stats available, prefer giving folga to groups that played more
+      let prevBonus = 0;
+      if (prevMonthStats) {
+        const groupPlays = group.reduce((sum, id) => sum + (prevMonthStats.counts[id] || 0), 0);
+        prevBonus = -groupPlays * 0.1; // More plays last month → lower score → higher priority
+      }
+      const score = offCount + prevBonus;
+      if (score < bestScore) {
+        bestScore = score;
         bestSi = si;
       }
     }
     group.forEach(id => avail[bestSi].delete(id));
   });
 
-  // 1d. ENFORCE couple constraint: if one partner is off, the other MUST be off too
+  // 1e. ENFORCE couple constraint: if one partner is off, the other MUST be off too
   for (let si = 0; si < total; si++) {
     musicians.forEach(m => {
       if (!m.coupleId) return;
@@ -156,8 +219,21 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
   // Make sure all vocalists are in the queue
   leadVocalists.forEach(id => { if (!leadQ.includes(id)) leadQ.push(id); });
 
+  // If we have previous month stats, ensure the last lead doesn't lead first this month
+  if (prevMonthStats?.lastLead && leadQ[0] === prevMonthStats.lastLead) {
+    const idx = leadQ.indexOf(prevMonthStats.lastLead);
+    if (idx === 0 && leadQ.length > 1) {
+      // Move last month's final lead to end of queue
+      leadQ.push(leadQ.shift());
+    }
+  }
+
+  // Initialize sundayCount with previous month awareness
   const sundayCount = {};
-  musicians.forEach(m => { sundayCount[m.id] = 0; });
+  musicians.forEach(m => {
+    // Start with a small bias from previous month to balance across months
+    sundayCount[m.id] = prevMonthStats ? Math.round((prevMonthStats.counts[m.id] || 0) * 0.3) : 0;
+  });
 
   for (let si = 0; si < total; si++) {
     const pool = avail[si];
@@ -213,7 +289,6 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
         const leadM = getM(lead);
         if (leadM?.roles.includes("teclado")) {
           schedule[`${si}-teclado-0`] = lead;
-          // Lead is already counted, don't double-count
         }
       }
     }
@@ -282,7 +357,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists) 
 }
 
 // ─── CONFLICT ANALYZER ──────────────────────────────────────────────────────
-function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, leadVocalists) {
+function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, leadVocalists, blockDates) {
   const conflicts = [];
   const totalSundays = sundays.length;
   const getMusicianById = (id) => musicians.find(m => m.id === id);
@@ -325,6 +400,23 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, lea
         }
       }
     });
+    // Check if someone is scheduled on a blocked date
+    if (blockDates && typeof blockDates === "object") {
+      const dk = dateKey(sundays[si]);
+      musicians.forEach(m => {
+        const blocked = blockDates[m.id];
+        if (Array.isArray(blocked) && blocked.includes(dk)) {
+          const isAssigned = Object.entries(schedule).some(([k, v]) => {
+            const parts = k.split("-");
+            return parseInt(parts[0]) === si && v === m.id;
+          });
+          if (isAssigned) {
+            conflicts.push({ type: "blocked_date", severity: "error",
+              msg: `${m.name} está escalado(a) no domingo ${si+1} (${fmt(sundays[si])}) mas marcou como indisponível!` });
+          }
+        }
+      });
+    }
   }
   musicians.forEach(m => {
     const count = (sundaysByMusician[m.id] || []).length;
@@ -380,6 +472,7 @@ export default function EscalaMusicos() {
   const [saving, setSaving] = useState(false);
   const [musicians, setMusicians] = useState(DEFAULT_MUSICIANS);
   const [editingMusician, setEditingMusician] = useState(null);
+  const [blockDates, setBlockDates] = useState({});
   const saveTimer = useRef(null);
   const monthKey = `${year}-${month}`;
   const sundays = getSundays(year, month);
@@ -390,12 +483,14 @@ export default function EscalaMusicos() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [schedules, rotation, musicianData] = await Promise.all([
+        const [schedules, rotation, musicianData, blockDatesData] = await Promise.all([
           apiGet("schedules"),
           apiGet("lead_rotation"),
           apiGet("musicians"),
+          apiGet("block_dates"),
         ]);
         if (schedules) setAllSchedules(schedules);
+        if (blockDatesData) setBlockDates(blockDatesData);
         if (musicianData) {
           setMusicians(musicianData);
           const lv = musicianData.filter(x => x.roles.includes("vocal_principal")).map(x => x.id);
@@ -425,6 +520,9 @@ export default function EscalaMusicos() {
   }
   function persistMusicians(newMusicians) {
     debouncedSave("musicians", newMusicians);
+  }
+  function persistBlockDates(newBlockDates) {
+    debouncedSave("block_dates", newBlockDates);
   }
 
   const schedule = allSchedules[monthKey] || {};
@@ -471,11 +569,65 @@ export default function EscalaMusicos() {
     }
     setSchedule(updated);
   }
+
+  // ── Block Dates helpers ──
+  function toggleBlockDate(musicianId, sundayDate) {
+    const dk = dateKey(sundayDate);
+    const current = blockDates[musicianId] || [];
+    const isBlocked = current.includes(dk);
+    const updated = {
+      ...blockDates,
+      [musicianId]: isBlocked ? current.filter(d => d !== dk) : [...current, dk]
+    };
+    setBlockDates(updated);
+    persistBlockDates(updated);
+  }
+  function isDateBlocked(musicianId, sundayDate) {
+    const dk = dateKey(sundayDate);
+    const blocked = blockDates[musicianId];
+    return Array.isArray(blocked) && blocked.includes(dk);
+  }
+  function getBlockedCountForMonth(musicianId) {
+    const blocked = blockDates[musicianId];
+    if (!Array.isArray(blocked)) return 0;
+    return blocked.filter(dk => {
+      return sundays.some(s => dateKey(s) === dk);
+    }).length;
+  }
+  function getMusiciansBlockedOnSunday(si) {
+    if (si >= sundays.length) return [];
+    const dk = dateKey(sundays[si]);
+    return musicians.filter(m => {
+      const blocked = blockDates[m.id];
+      return Array.isArray(blocked) && blocked.includes(dk);
+    });
+  }
+
+  // ── Get previous month info for scheduling ──
+  function getPrevMonthKey() {
+    let pm = month - 1, py = year;
+    if (pm < 0) { pm = 11; py--; }
+    return `${py}-${pm}`;
+  }
+  function getPrevMonthSundays() {
+    let pm = month - 1, py = year;
+    if (pm < 0) { pm = 11; py--; }
+    return getSundays(py, pm);
+  }
+
   function autoGenerate() {
     setGenerating(true);
     setTimeout(() => {
       const currentRotation = leadRotation.length > 0 ? leadRotation : leadVocalists;
-      const { schedule: newSched, newLeadQueue } = generateSchedule(sundays, currentRotation, musicians, leadVocalists);
+      // Get previous month's schedule for continuity
+      const prevKey = getPrevMonthKey();
+      const prevSchedule = allSchedules[prevKey] || null;
+      const prevSundays = getPrevMonthSundays();
+      const prevStats = prevSchedule ? getPrevMonthStats(prevSchedule, prevSundays, musicians) : null;
+
+      const { schedule: newSched, newLeadQueue } = generateSchedule(
+        sundays, currentRotation, musicians, leadVocalists, blockDates, prevStats
+      );
       const updatedSchedules = { ...allSchedules, [monthKey]: newSched };
       setAllSchedules(updatedSchedules);
       setLeadRotation(newLeadQueue);
@@ -518,7 +670,7 @@ export default function EscalaMusicos() {
     if (editingMusician === id) setEditingMusician(null);
   }
 
-  const conflicts = analyzeConflicts(schedule, sundays, leadRotation, musicians, leadVocalists);
+  const conflicts = analyzeConflicts(schedule, sundays, leadRotation, musicians, leadVocalists, blockDates);
   const errors = conflicts.filter(c => c.severity === "error");
   const warnings = conflicts.filter(c => c.severity === "warning");
   const stats = musicians.map(m => {
@@ -527,6 +679,11 @@ export default function EscalaMusicos() {
     return { ...m, count: suns.size, offWeeks: sundays.length - suns.size, sundays: suns, leadsThisMonth };
   });
   const hasData = Object.keys(schedule).length > 0;
+  const totalBlockedThisMonth = musicians.reduce((sum, m) => sum + getBlockedCountForMonth(m.id), 0);
+
+  // Check if previous month has schedule
+  const prevKey = getPrevMonthKey();
+  const hasPrevMonthSchedule = allSchedules[prevKey] && Object.keys(allSchedules[prevKey]).length > 0;
 
   if (!loaded) return (
     <div style={{ display:"flex", alignItems:"center", justifyContent:"center", height:"100vh", background:"#0d0b1e", color:"#c9a96e", fontFamily:"Georgia, serif", fontSize:"18px" }}>
@@ -580,6 +737,18 @@ export default function EscalaMusicos() {
             </button>
           )}
         </div>
+        {/* ── PREVIOUS MONTH INFO BANNER ── */}
+        {hasPrevMonthSchedule && (
+          <div style={{ marginBottom:"12px", padding:"8px 16px", borderRadius:"10px", background:"rgba(105,180,255,0.08)", border:"1px solid rgba(105,180,255,0.2)", fontSize:"11px", color:"#69b4ff", textAlign:"center" }}>
+            {"\u{1F4C6}"} Mês anterior tem escala salva — a geração automática vai considerar continuidade de rotação e folgas
+          </div>
+        )}
+        {/* ── BLOCK DATES BANNER ── */}
+        {totalBlockedThisMonth > 0 && (
+          <div style={{ marginBottom:"12px", padding:"8px 16px", borderRadius:"10px", background:"rgba(255,140,105,0.1)", border:"1px solid rgba(255,140,105,0.25)", fontSize:"11px", color:"#ff8c69", textAlign:"center" }}>
+            {"\u{1F6AB}"} {totalBlockedThisMonth} bloqueio{totalBlockedThisMonth > 1 ? "s" : ""} de data neste mês — músicos indisponíveis serão respeitados na geração
+          </div>
+        )}
         {/* ── CONFLICT BANNER ── */}
         {hasData && conflicts.length > 0 && (
           <div style={{ marginBottom:"20px", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(220,80,80,0.3)" }}>
@@ -602,7 +771,13 @@ export default function EscalaMusicos() {
         )}
         {/* ── TABS ── */}
         <div style={{ display:"flex", gap:"4px", marginBottom:"20px", background:"rgba(255,255,255,0.04)", borderRadius:"10px", padding:"4px" }}>
-          {[["escala","\u{1F4CB} Escala"],["resumo","\u{1F4CA} Resumo"],["musicos","\u{1F3B6} Músicos"],["conflitos",`\u26A0\uFE0F Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]].map(([t,label]) => (
+          {[
+            ["escala","\u{1F4CB} Escala"],
+            ["resumo","\u{1F4CA} Resumo"],
+            ["bloqueios",`\u{1F6AB} Datas${totalBlockedThisMonth > 0 ? ` (${totalBlockedThisMonth})` : ""}`],
+            ["musicos","\u{1F3B6} Músicos"],
+            ["conflitos",`\u26A0\uFE0F Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]
+          ].map(([t,label]) => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
               flex:1, padding:"10px 8px", border:"none", borderRadius:"8px", cursor:"pointer", fontSize:"13px", fontWeight:"600", fontFamily:"Georgia, serif", transition:"all 0.2s",
               background: activeTab === t ? "rgba(201,169,110,0.2)" : "transparent",
@@ -626,6 +801,7 @@ export default function EscalaMusicos() {
                 {sundays.map((s,i) => {
                   const leadId = schedule[`${i}-vocal_principal-0`];
                   const vc = leadId ? getVocalistColor(leadId) : null;
+                  const blockedMusicians = getMusiciansBlockedOnSunday(i);
                   return (
                     <div key={i} style={{
                       ...headerCellStyle, textAlign:"center",
@@ -634,6 +810,11 @@ export default function EscalaMusicos() {
                     }}>
                       <div style={{ fontSize:"10px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase" }}>Dom {i+1}</div>
                       <div style={{ fontSize:"17px", fontWeight:"700" }}>{fmt(s)}</div>
+                      {blockedMusicians.length > 0 && (
+                        <div style={{ fontSize:"8px", color:"#ff8c69", marginTop:"2px" }}>
+                          {"\u{1F6AB}"} {blockedMusicians.map(m => m.short).join(", ")}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -703,18 +884,23 @@ export default function EscalaMusicos() {
                                   const suns = getMusicianSundays(m.id);
                                   const overLimit = m.maxPerMonth && suns.size >= m.maxPerMonth;
                                   const mVc = isVocal ? getVocalistColor(m.id) : null;
+                                  const blocked = isDateBlocked(m.id, sundays[si]);
                                   return (
-                                    <button key={m.id} onClick={() => assign(si, pos.id, slot, m.id)} style={{
+                                    <button key={m.id} onClick={() => !blocked && assign(si, pos.id, slot, m.id)} style={{
                                       width:"100%", padding:"9px 14px", background: m.id===assigned ? (mVc ? mVc.bg : "rgba(201,169,110,0.15)") : "transparent",
-                                      border:"none", borderBottom:"1px solid rgba(255,255,255,0.05)", color: overLimit?"#666": (mVc ? mVc.text : "#f0e6d3"),
-                                      cursor:"pointer", textAlign:"left", fontSize:"12px", display:"flex", justifyContent:"space-between",
-                                      fontFamily:"Georgia, serif"
+                                      border:"none", borderBottom:"1px solid rgba(255,255,255,0.05)",
+                                      color: blocked ? "#ff4444" : (overLimit ? "#666" : (mVc ? mVc.text : "#f0e6d3")),
+                                      cursor: blocked ? "not-allowed" : "pointer", textAlign:"left", fontSize:"12px", display:"flex", justifyContent:"space-between",
+                                      fontFamily:"Georgia, serif", opacity: blocked ? 0.5 : 1
                                     }}>
                                       <span style={{ display:"flex", alignItems:"center", gap:"6px" }}>
                                         {mVc && <span style={{ width:"8px", height:"8px", borderRadius:"50%", background: mVc.tag, display:"inline-block" }} />}
                                         {m.name}
+                                        {blocked && <span style={{ fontSize:"9px", color:"#ff4444" }}>{"\u{1F6AB}"}</span>}
                                       </span>
-                                      <span style={{ fontSize:"10px", color:"#c9a96e", opacity:0.6 }}>{suns.size}x</span>
+                                      <span style={{ fontSize:"10px", color: blocked ? "#ff4444" : "#c9a96e", opacity:0.6 }}>
+                                        {blocked ? "indisponível" : `${suns.size}x`}
+                                      </span>
                                     </button>
                                   );
                                 })}
@@ -772,6 +958,7 @@ export default function EscalaMusicos() {
                   {sundays.map((s, si) => {
                     const leadId = schedule[`${si}-vocal_principal-0`];
                     const vc = leadId ? getVocalistColor(leadId) : null;
+                    const blockedHere = getMusiciansBlockedOnSunday(si);
                     return (
                       <div key={si} style={{ background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"14px", borderTop: vc ? `3px solid ${vc.tag}` : "3px solid rgba(255,255,255,0.1)" }}>
                         <div style={{ fontSize:"13px", fontWeight:"700", marginBottom:"8px", color:"#f0e6d3" }}>Dom {si+1} — {fmt(s)}</div>
@@ -793,6 +980,11 @@ export default function EscalaMusicos() {
                         <div style={{ marginTop:"6px", fontSize:"10px", color:"rgba(255,255,255,0.3)" }}>
                           Folga: {musicians.filter(m => !isOnSunday(m.id, si)).map(m => m.short).join(", ") || "ninguém"}
                         </div>
+                        {blockedHere.length > 0 && (
+                          <div style={{ marginTop:"4px", fontSize:"9px", color:"#ff8c69" }}>
+                            {"\u{1F6AB}"} Indisponíveis: {blockedHere.map(m => m.short).join(", ")}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
@@ -832,6 +1024,7 @@ export default function EscalaMusicos() {
                   const color = hasFolga ? "#5bc85b" : (m.noFolgaRequired ? "#c9a96e" : "#ff6060");
                   const vc = getVocalistColor(m.id);
                   const isVocalist = leadVocalists.includes(m.id);
+                  const blockedCount = getBlockedCountForMonth(m.id);
                   return (
                     <div key={m.id} style={{
                       background:"rgba(255,255,255,0.03)",
@@ -845,17 +1038,20 @@ export default function EscalaMusicos() {
                         {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> {"\u2022"} máx {m.maxPerMonth}x</span>}
                         {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
                         {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
+                        {blockedCount > 0 && <span style={{ color:"#ff8c69" }}> {"\u2022"} {blockedCount} bloqueio{blockedCount>1?"s":""}</span>}
                       </div>
                       <div style={{ display:"flex", gap:"4px", marginBottom:"8px" }}>
                         {sundays.map((_,i) => {
                           const isLeadHere = schedule[`${i}-vocal_principal-0`] === m.id;
+                          const isBlocked = isDateBlocked(m.id, sundays[i]);
                           return (
                             <div key={i} style={{
                               width:"20px", height:"20px", borderRadius:"5px", fontSize:"9px", fontWeight:"700",
-                              background: isOnSunday(m.id,i) ? (isLeadHere ? vc.tag : (isVocalist ? `${vc.tag}88` : "#c9a96e")) : "rgba(255,255,255,0.07)",
-                              color: isOnSunday(m.id,i) ? "#0d0b1e" : "rgba(255,255,255,0.25)",
-                              display:"flex", alignItems:"center", justifyContent:"center"
-                            }}>{isLeadHere ? "L" : i+1}</div>
+                              background: isBlocked ? "rgba(255,68,68,0.3)" : (isOnSunday(m.id,i) ? (isLeadHere ? vc.tag : (isVocalist ? `${vc.tag}88` : "#c9a96e")) : "rgba(255,255,255,0.07)"),
+                              color: isBlocked ? "#ff4444" : (isOnSunday(m.id,i) ? "#0d0b1e" : "rgba(255,255,255,0.25)"),
+                              display:"flex", alignItems:"center", justifyContent:"center",
+                              border: isBlocked ? "1px solid rgba(255,68,68,0.5)" : "none"
+                            }}>{isBlocked ? "\u2715" : (isLeadHere ? "L" : i+1)}</div>
                           );
                         })}
                       </div>
@@ -873,6 +1069,85 @@ export default function EscalaMusicos() {
           </div>
         )}
 
+        {/* ── TAB: BLOQUEIOS (Block Dates) ── */}
+        {activeTab === "bloqueios" && (
+          <div>
+            <div style={{ marginBottom:"16px" }}>
+              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"8px" }}>
+                {"\u{1F6AB}"} Datas Indisponíveis — {MONTHS[month]} {year}
+              </div>
+              <div style={{ fontSize:"12px", color:"rgba(240,230,211,0.5)", marginBottom:"16px" }}>
+                Marque os domingos em que cada músico está indisponível. Clique para bloquear/desbloquear.
+              </div>
+            </div>
+            <div style={{ overflowX:"auto" }}>
+              <div style={{ display:"grid", gridTemplateColumns:`180px repeat(${sundays.length}, 1fr)`, gap:"3px", minWidth:"400px" }}>
+                {/* Header row */}
+                <div style={{ ...headerCellStyle, fontSize:"11px", fontWeight:"700", color:"#c9a96e" }}>Músico</div>
+                {sundays.map((s, i) => (
+                  <div key={i} style={{ ...headerCellStyle, textAlign:"center" }}>
+                    <div style={{ fontSize:"10px", color:"#c9a96e", letterSpacing:"2px" }}>Dom {i+1}</div>
+                    <div style={{ fontSize:"14px", fontWeight:"700" }}>{fmt(s)}</div>
+                  </div>
+                ))}
+                {/* One row per musician */}
+                {musicians.map(m => {
+                  const vc = getVocalistColor(m.id);
+                  const isVocalist = m.roles.includes("vocal_principal");
+                  return [
+                    <div key={`name-${m.id}`} style={{
+                      padding:"10px 12px", background:"rgba(255,255,255,0.03)", display:"flex", alignItems:"center", gap:"8px",
+                      borderLeft: isVocalist ? `3px solid ${vc.tag}` : "3px solid transparent"
+                    }}>
+                      <span style={{ fontSize:"13px", fontWeight:"600", color: isVocalist ? vc.text : "#f0e6d3" }}>{m.short}</span>
+                      {getBlockedCountForMonth(m.id) > 0 && (
+                        <span style={{ fontSize:"9px", color:"#ff8c69", background:"rgba(255,140,105,0.15)", padding:"2px 6px", borderRadius:"8px" }}>
+                          {getBlockedCountForMonth(m.id)}
+                        </span>
+                      )}
+                    </div>,
+                    ...sundays.map((s, si) => {
+                      const blocked = isDateBlocked(m.id, s);
+                      return (
+                        <button key={`block-${m.id}-${si}`} onClick={() => toggleBlockDate(m.id, s)} style={{
+                          background: blocked ? "rgba(255,68,68,0.2)" : "rgba(255,255,255,0.02)",
+                          border: blocked ? "1px solid rgba(255,68,68,0.4)" : "1px solid rgba(255,255,255,0.06)",
+                          borderRadius:"6px", padding:"8px 4px", cursor:"pointer", minHeight:"44px",
+                          display:"flex", alignItems:"center", justifyContent:"center",
+                          transition:"all 0.15s", fontFamily:"Georgia, serif"
+                        }}>
+                          {blocked ? (
+                            <span style={{ fontSize:"16px", color:"#ff4444" }}>{"\u{1F6AB}"}</span>
+                          ) : (
+                            <span style={{ fontSize:"14px", color:"rgba(255,255,255,0.1)" }}>{"\u2713"}</span>
+                          )}
+                        </button>
+                      );
+                    })
+                  ];
+                })}
+              </div>
+            </div>
+            {totalBlockedThisMonth > 0 && (
+              <div style={{ marginTop:"16px", padding:"12px 16px", borderRadius:"10px", background:"rgba(255,140,105,0.08)", border:"1px solid rgba(255,140,105,0.2)" }}>
+                <div style={{ fontSize:"11px", color:"#ff8c69", fontWeight:"600", marginBottom:"8px" }}>Resumo de Bloqueios</div>
+                {musicians.filter(m => getBlockedCountForMonth(m.id) > 0).map(m => {
+                  const blocked = (blockDates[m.id] || []).filter(dk => sundays.some(s => dateKey(s) === dk));
+                  return (
+                    <div key={m.id} style={{ fontSize:"12px", color:"rgba(240,230,211,0.6)", padding:"4px 0", display:"flex", gap:"8px" }}>
+                      <span style={{ fontWeight:"600", color:"#f0e6d3", minWidth:"80px" }}>{m.short}:</span>
+                      <span>{blocked.map(dk => {
+                        const parts = dk.split("-");
+                        return `${parts[2]}/${parts[1]}`;
+                      }).join(", ")}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── TAB: MÚSICOS ── */}
         {activeTab === "musicos" && (
           <div>
@@ -887,6 +1162,7 @@ export default function EscalaMusicos() {
                 const isEditing = editingMusician === m.id;
                 const vc = getVocalistColor(m.id);
                 const isVocalist = m.roles.includes("vocal_principal");
+                const blockedCount = getBlockedCountForMonth(m.id);
                 return (
                   <div key={m.id} style={{
                     background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"16px 20px",
@@ -911,6 +1187,11 @@ export default function EscalaMusicos() {
                           <div>
                             <span style={{ fontWeight:"700", fontSize:"14px", color: isVocalist ? vc.text : "#f0e6d3" }}>{m.short}</span>
                             {m.name !== m.short && <span style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)", marginLeft:"8px" }}>{m.name}</span>}
+                            {blockedCount > 0 && (
+                              <span style={{ fontSize:"10px", color:"#ff8c69", marginLeft:"8px" }}>
+                                {"\u{1F6AB}"} {blockedCount} data{blockedCount>1?"s":""} bloqueada{blockedCount>1?"s":""}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1012,6 +1293,8 @@ export default function EscalaMusicos() {
                 "Back Vocal #3: pode ficar vazio quando necessário",
                 "Baixo, Guitarra e Violão: podem ficar vazios se necessário",
                 "Mínimo 2 back vocals por domingo",
+                "Datas bloqueadas: músicos indisponíveis são removidos automaticamente",
+                "Mês anterior: quando existe, a rotação de leads e folgas considera continuidade",
               ].map((r,i) => (
                 <div key={i} style={{ padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.05)", fontSize:"12px", color:"rgba(240,230,211,0.6)", display:"flex", gap:"8px" }}>
                   <span style={{ color:"#c9a96e", fontSize:"14px" }}>{"\u2726"}</span>{r}
