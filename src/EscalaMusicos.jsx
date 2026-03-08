@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-// ─── DATA ───────────────────────────────────────────────────────────────────
-const MUSICIANS = [
+// ─── DEFAULT DATA ────────────────────────────────────────────────────────────
+const DEFAULT_MUSICIANS = [
   { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
   { id: "asafe", name: "Asafe", short: "Asafe", roles: ["teclado","violao","baixo","bateria"], coupleId: "jokasta" },
   { id: "jokasta", name: "Jokasta", short: "Jokasta", roles: ["vocal_principal","vocal_back"], coupleId: "asafe" },
@@ -28,17 +28,16 @@ const VOCALIST_COLORS = {
 const DEFAULT_VOCALIST_COLOR = { bg: "rgba(201,169,110,0.15)", border: "rgba(201,169,110,0.3)", text: "#c9a96e", tag: "#c9a96e" };
 function getVocalistColor(id) { return VOCALIST_COLORS[id] || DEFAULT_VOCALIST_COLOR; }
 
-const LEAD_VOCALISTS = ["hugo","jokasta","matheu","leandro","aline","ana","clivison","madalena"];
 const POSITIONS = [
-  { id: "vocal_principal", label: "Vocal Principal", count: 1, icon: "🎤", color: "#e8a838", required: true },
-  { id: "vocal_back", label: "Back Vocal", count: 3, icon: "🎵", color: "#9b8aff", required: false, minCount: 2 },
-  { id: "teclado", label: "Teclado", count: 1, icon: "🎹", color: "#5bc8af", required: true },
-  { id: "violao", label: "Violão", count: 1, icon: "🎸", color: "#ff8c69", required: false },
-  { id: "baixo", label: "Baixo", count: 1, icon: "🎼", color: "#69b4ff", required: false },
-  { id: "guitarra", label: "Guitarra", count: 1, icon: "⚡", color: "#ff69b4", required: false },
-  { id: "bateria", label: "Bateria", count: 1, icon: "🥁", color: "#98d982", required: true },
+  { id: "vocal_principal", label: "Vocal Principal", count: 1, icon: "\u{1F3A4}", color: "#e8a838", required: true },
+  { id: "vocal_back", label: "Back Vocal", count: 3, icon: "\u{1F3B5}", color: "#9b8aff", required: false, minCount: 2 },
+  { id: "teclado", label: "Teclado", count: 1, icon: "\u{1F3B9}", color: "#5bc8af", required: true },
+  { id: "violao", label: "Viol\u00e3o", count: 1, icon: "\u{1F3B8}", color: "#ff8c69", required: false },
+  { id: "baixo", label: "Baixo", count: 1, icon: "\u{1F3BC}", color: "#69b4ff", required: false },
+  { id: "guitarra", label: "Guitarra", count: 1, icon: "\u26A1", color: "#ff69b4", required: false },
+  { id: "bateria", label: "Bateria", count: 1, icon: "\u{1F941}", color: "#98d982", required: true },
 ];
-const MONTHS = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+const MONTHS = ["Janeiro","Fevereiro","Mar\u00e7o","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 function getSundays(year, month) {
   const sundays = [];
@@ -48,13 +47,13 @@ function getSundays(year, month) {
   return sundays;
 }
 function fmt(date) { return `${String(date.getDate()).padStart(2,"0")}/${String(date.getMonth()+1).padStart(2,"0")}`; }
-function getMusicianById(id) { return MUSICIANS.find(m => m.id === id); }
 // ─── SMART SCHEDULER ────────────────────────────────────────────────────────
-function generateSchedule(sundays, leadRotation) {
+function generateSchedule(sundays, leadRotation, musicians, leadVocalists) {
   const totalSundays = sundays.length;
   const schedule = {};
   const musicianSundayCount = {};
-  MUSICIANS.forEach(m => { musicianSundayCount[m.id] = 0; });
+  const getMusicianById = (id) => musicians.find(m => m.id === id);
+  musicians.forEach(m => { musicianSundayCount[m.id] = 0; });
   let leadQueue = [...leadRotation];
   const newRotation = [...leadRotation];
   for (let si = 0; si < totalSundays; si++) {
@@ -92,7 +91,7 @@ function generateSchedule(sundays, leadRotation) {
       break;
     }
     if (!leadAssigned) {
-      const fallbacks = LEAD_VOCALISTS.filter(id => {
+      const fallbacks = leadVocalists.filter(id => {
         const m = getMusicianById(id);
         if (!m) return false;
         if (m.maxPerMonth && musicianSundayCount[id] >= m.maxPerMonth) return false;
@@ -110,10 +109,8 @@ function generateSchedule(sundays, leadRotation) {
       musicianSundayCount[leadAssigned]++;
       dayAssignments["vocal_principal"] = [leadAssigned];
       const leadM = getMusicianById(leadAssigned);
-      // ── RULE: Hugo vocal → Hugo violão, Leandro vocal → Leandro violão ──
       if ((leadAssigned === "hugo" || leadAssigned === "leandro") && leadM?.canDoubleVocalViolao) {
         schedule[`${si}-violao-0`] = leadAssigned;
-        // don't add to usedThisSunday again — they can double
       }
       if (leadM?.coupleId) {
         const partner = getMusicianById(leadM.coupleId);
@@ -127,7 +124,7 @@ function generateSchedule(sundays, leadRotation) {
       }
     }
     // ── STEP 2: Back Vocals (3 slots, min 2) ──
-    const backVocalCandidates = MUSICIANS.filter(m =>
+    const backVocalCandidates = musicians.filter(m =>
       m.roles.includes("vocal_back") &&
       !usedThisSunday.has(m.id) &&
       !(m.maxPerMonth && musicianSundayCount[m.id] >= m.maxPerMonth) &&
@@ -175,13 +172,10 @@ function generateSchedule(sundays, leadRotation) {
       }
     });
     // ── STEP 3: Instruments ──
-    // Required: teclado, bateria (always fill)
-    // Optional: violao (may already be assigned by lead rule), baixo, guitarra (can be empty)
     const instrumentPositions = ["teclado","bateria","violao","baixo","guitarra"];
     for (const posId of instrumentPositions) {
-      // Skip violão if already assigned (Hugo/Leandro lead rule)
       if (posId === "violao" && schedule[`${si}-violao-0`]) continue;
-      const candidates = MUSICIANS.filter(m =>
+      const candidates = musicians.filter(m =>
         m.roles.includes(posId) &&
         !usedThisSunday.has(m.id) &&
         !(m.maxPerMonth && musicianSundayCount[m.id] >= m.maxPerMonth)
@@ -192,65 +186,58 @@ function generateSchedule(sundays, leadRotation) {
         usedThisSunday.add(chosen);
         musicianSundayCount[chosen]++;
       }
-      // If no candidate and position is optional (baixo, guitarra, violão), leave empty — that's OK
     }
   }
   return { schedule, newLeadQueue: leadQueue };
 }
 // ─── CONFLICT ANALYZER ──────────────────────────────────────────────────────
-function analyzeConflicts(schedule, sundays, leadRotationHistory) {
+function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, leadVocalists) {
   const conflicts = [];
   const totalSundays = sundays.length;
+  const getMusicianById = (id) => musicians.find(m => m.id === id);
   const counts = {};
   const sundaysByMusician = {};
-  MUSICIANS.forEach(m => { counts[m.id] = 0; sundaysByMusician[m.id] = []; });
+  musicians.forEach(m => { counts[m.id] = 0; sundaysByMusician[m.id] = []; });
   Object.entries(schedule).forEach(([key, val]) => {
     const si = parseInt(key.split("-")[0]);
     if (!counts[val] && counts[val] !== 0) return;
     counts[val]++;
     if (!sundaysByMusician[val].includes(si)) sundaysByMusician[val].push(si);
   });
-  // Check required positions
   for (let si = 0; si < totalSundays; si++) {
     if (!schedule[`${si}-vocal_principal-0`]) {
-      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Vocal Principal (obrigatório)` });
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Vocal Principal (obrigat\u00f3rio)` });
     }
     if (!schedule[`${si}-teclado-0`]) {
-      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Teclado (obrigatório)` });
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Teclado (obrigat\u00f3rio)` });
     }
     if (!schedule[`${si}-bateria-0`]) {
-      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Bateria (obrigatório)` });
+      conflicts.push({ type: "missing_required", severity: "error", msg: `Domingo ${si+1}: sem Bateria (obrigat\u00f3rio)` });
     }
-    // Check minimum back vocals (2)
     const backCount = [0,1,2].filter(s => schedule[`${si}-vocal_back-${s}`]).length;
     if (backCount < 2) {
-      conflicts.push({ type: "low_back", severity: "warning", msg: `Domingo ${si+1}: apenas ${backCount} back vocal (mínimo recomendado: 2)` });
+      conflicts.push({ type: "low_back", severity: "warning", msg: `Domingo ${si+1}: apenas ${backCount} back vocal (m\u00ednimo recomendado: 2)` });
     }
-    // Check Hugo/Leandro vocal → violão rule
     const lead = schedule[`${si}-vocal_principal-0`];
     if ((lead === "hugo" || lead === "leandro") && schedule[`${si}-violao-0`] !== lead) {
       const m = getMusicianById(lead);
-      conflicts.push({ type: "vocal_violao", severity: "warning", msg: `Domingo ${si+1}: ${m?.name} é lead mas não está no violão` });
-    }
-    // Info: optional positions empty
-    if (!schedule[`${si}-baixo-0`]) {
-      // Not an error — just info (no conflict added)
+      conflicts.push({ type: "vocal_violao", severity: "warning", msg: `Domingo ${si+1}: ${m?.name} \u00e9 lead mas n\u00e3o est\u00e1 no viol\u00e3o` });
     }
   }
-  MUSICIANS.forEach(m => {
+  musicians.forEach(m => {
     const count = (sundaysByMusician[m.id] || []).length;
     const offWeeks = totalSundays - count;
     if (offWeeks === 0 && totalSundays >= 4 && !m.noFolgaRequired) {
-      conflicts.push({ type: "no_folga", severity: "error", msg: `${m.name} não tem nenhuma folga este mês` });
+      conflicts.push({ type: "no_folga", severity: "error", msg: `${m.name} n\u00e3o tem nenhuma folga este m\u00eas` });
     }
     if (m.maxPerMonth && count > m.maxPerMonth) {
-      conflicts.push({ type: "ana_limit", severity: "error", msg: `${m.name} escalada ${count}x (máximo ${m.maxPerMonth}x/mês)` });
+      conflicts.push({ type: "ana_limit", severity: "error", msg: `${m.name} escalada ${count}x (m\u00e1ximo ${m.maxPerMonth}x/m\u00eas)` });
     }
     if (m.alternating) {
       const suns = (sundaysByMusician[m.id] || []).sort();
       for (let i = 1; i < suns.length; i++) {
         if (suns[i] - suns[i-1] === 1) {
-          conflicts.push({ type: "madalena", severity: "error", msg: `Madalena escalada em domingos consecutivos (dom ${suns[i-1]+1} e ${suns[i]+1})` });
+          conflicts.push({ type: "madalena", severity: "error", msg: `${m.name} escalada em domingos consecutivos (dom ${suns[i-1]+1} e ${suns[i]+1})` });
           break;
         }
       }
@@ -277,7 +264,7 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory) {
     for (let j = i+1; j < leads.length; j++) {
       if (leads[i] === leads[j]) {
         const between = leads.slice(i+1, j);
-        const allLeads = LEAD_VOCALISTS.filter(id => {
+        const allLeads = leadVocalists.filter(id => {
           const m = getMusicianById(id);
           return !(m?.maxPerMonth && (sundaysByMusician[id]||[]).length >= m.maxPerMonth);
         });
@@ -298,20 +285,36 @@ export default function EscalaMusicos() {
   const [month, setMonth] = useState(today.getMonth());
   const [year, setYear] = useState(today.getFullYear());
   const [allSchedules, setAllSchedules] = useState({});
-  const [leadRotation, setLeadRotation] = useState([...LEAD_VOCALISTS]);
+  const [leadRotation, setLeadRotation] = useState([]);
   const [activeCell, setActiveCell] = useState(null);
   const [activeTab, setActiveTab] = useState("escala");
   const [generating, setGenerating] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [musicians, setMusicians] = useState(DEFAULT_MUSICIANS);
+  const [editingMusician, setEditingMusician] = useState(null);
   const monthKey = `${year}-${month}`;
   const sundays = getSundays(year, month);
-  // ── Storage (localStorage) ──
+  // Derived
+  const leadVocalists = musicians.filter(m => m.roles.includes("vocal_principal")).map(m => m.id);
+  const getMusicianById = (id) => musicians.find(m => m.id === id);
+  // ── Storage ──
   useEffect(() => {
     try {
       const s = localStorage.getItem("escala_schedules");
       const r = localStorage.getItem("escala_lead_rotation");
+      const m = localStorage.getItem("escala_musicians");
       if (s) setAllSchedules(JSON.parse(s));
-      if (r) setLeadRotation(JSON.parse(r));
+      if (m) {
+        setMusicians(JSON.parse(m));
+        const parsed = JSON.parse(m);
+        const lv = parsed.filter(x => x.roles.includes("vocal_principal")).map(x => x.id);
+        if (r) setLeadRotation(JSON.parse(r));
+        else setLeadRotation(lv);
+      } else {
+        const lv = DEFAULT_MUSICIANS.filter(x => x.roles.includes("vocal_principal")).map(x => x.id);
+        if (r) setLeadRotation(JSON.parse(r));
+        else setLeadRotation(lv);
+      }
     } catch(e) { console.error("Error loading data:", e); }
     setLoaded(true);
   }, []);
@@ -320,6 +323,11 @@ export default function EscalaMusicos() {
       localStorage.setItem("escala_schedules", JSON.stringify(schedules));
       localStorage.setItem("escala_lead_rotation", JSON.stringify(rotation));
     } catch(e) { console.error("Error saving data:", e); }
+  }
+  function persistMusicians(newMusicians) {
+    try {
+      localStorage.setItem("escala_musicians", JSON.stringify(newMusicians));
+    } catch(e) { console.error("Error saving musicians:", e); }
   }
   const schedule = allSchedules[monthKey] || {};
   function setSchedule(newSched) {
@@ -345,7 +353,6 @@ export default function EscalaMusicos() {
   function getAssigned(si, posId, slot) { return schedule[`${si}-${posId}-${slot}`] || null; }
   function assign(si, posId, slot, musicianId) {
     const updated = { ...schedule, [`${si}-${posId}-${slot}`]: musicianId };
-    // Auto-assign violão when Hugo or Leandro become lead
     if (posId === "vocal_principal" && (musicianId === "hugo" || musicianId === "leandro")) {
       updated[`${si}-violao-0`] = musicianId;
     }
@@ -356,7 +363,6 @@ export default function EscalaMusicos() {
     const updated = { ...schedule };
     const wasLead = posId === "vocal_principal" ? updated[`${si}-vocal_principal-0`] : null;
     delete updated[`${si}-${posId}-${slot}`];
-    // If clearing lead vocal for Hugo/Leandro, also clear their violão
     if (posId === "vocal_principal" && (wasLead === "hugo" || wasLead === "leandro")) {
       if (updated[`${si}-violao-0`] === wasLead) {
         delete updated[`${si}-violao-0`];
@@ -367,7 +373,7 @@ export default function EscalaMusicos() {
   function autoGenerate() {
     setGenerating(true);
     setTimeout(() => {
-      const { schedule: newSched, newLeadQueue } = generateSchedule(sundays, leadRotation);
+      const { schedule: newSched, newLeadQueue } = generateSchedule(sundays, leadRotation, musicians, leadVocalists);
       const updatedSchedules = { ...allSchedules, [monthKey]: newSched };
       const updatedRotation = newLeadQueue;
       setAllSchedules(updatedSchedules);
@@ -383,10 +389,38 @@ export default function EscalaMusicos() {
     setAllSchedules(updated);
     persist(updated, leadRotation);
   }
-  const conflicts = analyzeConflicts(schedule, sundays, leadRotation);
+  // ── Musicians management ──
+  function updateMusician(id, changes) {
+    const updated = musicians.map(m => m.id === id ? { ...m, ...changes } : m);
+    setMusicians(updated);
+    persistMusicians(updated);
+  }
+  function toggleRole(musicianId, roleId) {
+    const m = musicians.find(x => x.id === musicianId);
+    if (!m) return;
+    const hasRole = m.roles.includes(roleId);
+    const newRoles = hasRole ? m.roles.filter(r => r !== roleId) : [...m.roles, roleId];
+    updateMusician(musicianId, { roles: newRoles });
+  }
+  function addMusician() {
+    const newId = `musico_${Date.now()}`;
+    const newM = { id: newId, name: "Novo M\u00fasico", short: "Novo", roles: [] };
+    const updated = [...musicians, newM];
+    setMusicians(updated);
+    persistMusicians(updated);
+    setEditingMusician(newId);
+  }
+  function removeMusician(id) {
+    const updated = musicians.filter(m => m.id !== id);
+    setMusicians(updated);
+    persistMusicians(updated);
+    if (editingMusician === id) setEditingMusician(null);
+  }
+
+  const conflicts = analyzeConflicts(schedule, sundays, leadRotation, musicians, leadVocalists);
   const errors = conflicts.filter(c => c.severity === "error");
   const warnings = conflicts.filter(c => c.severity === "warning");
-  const stats = MUSICIANS.map(m => {
+  const stats = musicians.map(m => {
     const suns = getMusicianSundays(m.id);
     const leadsThisMonth = sundays.filter((_, si) => schedule[`${si}-vocal_principal-0`] === m.id).length;
     return { ...m, count: suns.size, offWeeks: sundays.length - suns.size, sundays: suns, leadsThisMonth };
@@ -403,23 +437,23 @@ export default function EscalaMusicos() {
       <div style={{ position:"relative", maxWidth:"1100px", margin:"0 auto", padding:"24px 16px" }}>
         {/* ── HEADER ── */}
         <div style={{ textAlign:"center", marginBottom:"28px" }}>
-          <div style={{ fontSize:"10px", letterSpacing:"8px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"6px" }}>Ministério de Louvor</div>
+          <div style={{ fontSize:"10px", letterSpacing:"8px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"6px" }}>Minist\u00e9rio de Louvor</div>
           <h1 style={{ fontSize:"clamp(26px,5vw,40px)", fontWeight:"900", margin:"0 0 4px", color:"#f0e6d3", letterSpacing:"-1px" }}>
-            ✦ Escala de Músicos ✦
+            {"\u2726"} Escala de M\u00fasicos {"\u2726"}
           </h1>
           <div style={{ width:"80px", height:"1px", background:"linear-gradient(90deg,transparent,#c9a96e,transparent)", margin:"10px auto 16px" }} />
           <div style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:"16px" }}>
-            <button onClick={prevMonth} style={navBtnStyle}>‹</button>
+            <button onClick={prevMonth} style={navBtnStyle}>{"\u2039"}</button>
             <span style={{ fontSize:"20px", fontWeight:"700", minWidth:"220px", textAlign:"center", color:"#f0e6d3" }}>
               {MONTHS[month]} {year}
               <span style={{ fontSize:"12px", color:"#c9a96e", marginLeft:"8px" }}>({sundays.length} domingos)</span>
             </span>
-            <button onClick={nextMonth} style={navBtnStyle}>›</button>
+            <button onClick={nextMonth} style={navBtnStyle}>{"\u203A"}</button>
           </div>
         </div>
         {/* ── VOCALIST COLOR LEGEND ── */}
         <div style={{ display:"flex", gap:"8px", flexWrap:"wrap", justifyContent:"center", marginBottom:"16px" }}>
-          {LEAD_VOCALISTS.map(id => {
+          {leadVocalists.map(id => {
             const m = getMusicianById(id);
             const vc = getVocalistColor(id);
             return (
@@ -437,37 +471,37 @@ export default function EscalaMusicos() {
           <button onClick={autoGenerate} disabled={generating} style={{
             ...actionBtnStyle, background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e", fontWeight:"700"
           }}>
-            {generating ? "⏳ Gerando..." : "✨ Gerar Escala Automática"}
+            {generating ? "\u23F3 Gerando..." : "\u2728 Gerar Escala Autom\u00e1tica"}
           </button>
           {hasData && (
             <button onClick={clearMonth} style={{ ...actionBtnStyle, background:"rgba(220,80,80,0.15)", border:"1px solid rgba(220,80,80,0.3)", color:"#ff9999" }}>
-              🗑 Limpar Mês
+              {"\u{1F5D1}"} Limpar M\u00eas
             </button>
           )}
         </div>
-        {/* ── CONFLICT BANNER ── */}
-        {conflicts.length > 0 && (
+        {/* ── CONFLICT BANNER (only when there's schedule data) ── */}
+        {hasData && conflicts.length > 0 && (
           <div style={{ marginBottom:"20px", borderRadius:"12px", overflow:"hidden", border:"1px solid rgba(220,80,80,0.3)" }}>
             {errors.map((c,i) => (
               <div key={i} style={{ padding:"10px 16px", background:"rgba(220,60,60,0.15)", fontSize:"13px", color:"#ffaaaa", borderBottom: i < errors.length-1 ? "1px solid rgba(220,80,80,0.2)" : "none" }}>
-                🔴 {c.msg}
+                {"\u{1F534}"} {c.msg}
               </div>
             ))}
             {warnings.map((c,i) => (
               <div key={i} style={{ padding:"10px 16px", background:"rgba(240,160,40,0.12)", fontSize:"13px", color:"#ffd080", borderTop: errors.length > 0 && i === 0 ? "1px solid rgba(240,160,40,0.2)" : "none", borderBottom: i < warnings.length-1 ? "1px solid rgba(240,160,40,0.15)" : "none" }}>
-                🟡 {c.msg}
+                {"\u{1F7E1}"} {c.msg}
               </div>
             ))}
           </div>
         )}
         {hasData && conflicts.length === 0 && (
           <div style={{ marginBottom:"20px", padding:"10px 16px", borderRadius:"10px", background:"rgba(80,180,100,0.12)", border:"1px solid rgba(80,180,100,0.25)", fontSize:"13px", color:"#80e880", textAlign:"center" }}>
-            ✅ Nenhum conflito encontrado — escala válida!
+            {"\u2705"} Nenhum conflito encontrado {"\u2014"} escala v\u00e1lida!
           </div>
         )}
         {/* ── TABS ── */}
         <div style={{ display:"flex", gap:"4px", marginBottom:"20px", background:"rgba(255,255,255,0.04)", borderRadius:"10px", padding:"4px" }}>
-          {[["escala","📋 Escala"],["resumo","📊 Resumo"],["conflitos",`⚠️ Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]].map(([t,label]) => (
+          {[["escala","\u{1F4CB} Escala"],["resumo","\u{1F4CA} Resumo"],["musicos","\u{1F3B6} M\u00fasicos"],["conflitos",`\u26A0\uFE0F Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]].map(([t,label]) => (
             <button key={t} onClick={() => setActiveTab(t)} style={{
               flex:1, padding:"10px 8px", border:"none", borderRadius:"8px", cursor:"pointer", fontSize:"13px", fontWeight:"600", fontFamily:"Georgia, serif", transition:"all 0.2s",
               background: activeTab === t ? "rgba(201,169,110,0.2)" : "transparent",
@@ -481,7 +515,7 @@ export default function EscalaMusicos() {
           <div style={{ overflowX:"auto", marginBottom:"24px" }}>
             {!hasData && (
               <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(240,230,211,0.3)", fontSize:"15px" }}>
-                Clique em <strong style={{color:"#c9a96e"}}>✨ Gerar Escala Automática</strong> ou atribua músicos manualmente
+                Clique em <strong style={{color:"#c9a96e"}}>{"\u2728"} Gerar Escala Autom\u00e1tica</strong> ou atribua m\u00fasicos manualmente
               </div>
             )}
             {hasData && (
@@ -529,11 +563,9 @@ export default function EscalaMusicos() {
                         const isActive = activeCell === cellKey;
                         const isVocal = pos.id === "vocal_principal" || pos.id === "vocal_back";
                         const isLead = pos.id === "vocal_principal";
-                        // Use vocalist color for vocal positions
                         const vc = isVocal && assigned ? getVocalistColor(assigned) : null;
                         const cellBg = vc ? vc.bg : (musician ? `${pos.color}18` : "transparent");
                         const cellTextColor = vc ? vc.text : (isLead ? "#e8a838" : pos.color);
-                        // Highlight Hugo/Leandro doubling on violão
                         const isDoubling = pos.id === "violao" && assigned && (assigned === "hugo" || assigned === "leandro") && schedule[`${si}-vocal_principal-0`] === assigned;
                         return (
                           <div key={`cell-${cellKey}`} style={{ position:"relative", background:"rgba(255,255,255,0.02)", borderTop:slotIdx===0?"1px solid rgba(255,255,255,0.06)":"none" }}>
@@ -563,9 +595,9 @@ export default function EscalaMusicos() {
                                     width:"100%", padding:"10px 14px", background:"rgba(220,80,80,0.15)", border:"none",
                                     borderBottom:"1px solid rgba(255,255,255,0.08)", color:"#ff9999", cursor:"pointer",
                                     textAlign:"left", fontSize:"12px", fontFamily:"Georgia, serif"
-                                  }}>✕ Remover</button>
+                                  }}>{"\u2715"} Remover</button>
                                 )}
-                                {MUSICIANS.filter(m => m.roles.includes(pos.id)).map(m => {
+                                {musicians.filter(m => m.roles.includes(pos.id)).map(m => {
                                   const suns = getMusicianSundays(m.id);
                                   const overLimit = m.maxPerMonth && suns.size >= m.maxPerMonth;
                                   const mVc = isVocal ? getVocalistColor(m.id) : null;
@@ -600,7 +632,7 @@ export default function EscalaMusicos() {
         {activeTab === "resumo" && (
           <div>
             <div style={{ marginBottom:"20px", background:"rgba(232,168,56,0.08)", border:"1px solid rgba(232,168,56,0.2)", borderRadius:"12px", padding:"16px 20px" }}>
-              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>🎤 Fila de Rotação dos Leads</div>
+              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>{"\u{1F3A4}"} Fila de Rota\u00e7\u00e3o dos Leads</div>
               <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
                 {leadRotation.slice(0,8).map((id,i) => {
                   const m = getMusicianById(id);
@@ -612,18 +644,18 @@ export default function EscalaMusicos() {
                       border: i===0 ? `1px solid ${vc.border}` : "1px solid rgba(255,255,255,0.1)",
                       color: i===0 ? vc.text : "rgba(240,230,211,0.7)"
                     }}>
-                      {i===0 && "→ "}{m?.short}
+                      {i===0 && "\u2192 "}{m?.short}
                     </div>
                   );
                 })}
                 {leadRotation.length > 8 && <div style={{ color:"rgba(255,255,255,0.3)", fontSize:"12px", padding:"6px" }}>+{leadRotation.length-8} mais</div>}
               </div>
               <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.3)", marginTop:"8px" }}>
-                O próximo a ser escalado como lead começa do início após todos passarem pela rotação
+                O pr\u00f3ximo a ser escalado como lead come\u00e7a do in\u00edcio ap\u00f3s todos passarem pela rota\u00e7\u00e3o
               </div>
             </div>
             <div style={{ marginBottom:"20px", background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"16px 20px" }}>
-              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>Leads Este Mês</div>
+              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>Leads Este M\u00eas</div>
               <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
                 {sundays.map((_,si) => {
                   const leadId = schedule[`${si}-vocal_principal-0`];
@@ -638,7 +670,7 @@ export default function EscalaMusicos() {
                         color: vc ? vc.text : "rgba(255,255,255,0.2)",
                         border: vc ? `1px solid ${vc.border}` : "1px solid rgba(255,255,255,0.08)"
                       }}>
-                        {m ? m.short : "—"}
+                        {m ? m.short : "\u2014"}
                       </div>
                     </div>
                   );
@@ -650,7 +682,7 @@ export default function EscalaMusicos() {
                 const hasFolga = m.offWeeks >= 1;
                 const color = hasFolga ? "#5bc85b" : "#ff6060";
                 const vc = getVocalistColor(m.id);
-                const isVocalist = LEAD_VOCALISTS.includes(m.id);
+                const isVocalist = leadVocalists.includes(m.id);
                 return (
                   <div key={m.id} style={{
                     background:"rgba(255,255,255,0.03)",
@@ -661,9 +693,9 @@ export default function EscalaMusicos() {
                     <div style={{ fontSize:"13px", fontWeight:"700", color: isVocalist ? vc.text : "#f0e6d3", marginBottom:"2px" }}>{m.short}</div>
                     <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)", marginBottom:"10px" }}>
                       {m.name !== m.short ? m.name.replace(m.short,"").trim() : ""}
-                      {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> • máx {m.maxPerMonth}x</span>}
-                      {m.alternating && <span style={{ color:"#c9a96e" }}> • alternado</span>}
-                      {m.coupleId && <span style={{ color:"#aaa8ff" }}> • casal</span>}
+                      {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> {"\u2022"} m\u00e1x {m.maxPerMonth}x</span>}
+                      {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
+                      {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
                     </div>
                     <div style={{ display:"flex", gap:"4px", marginBottom:"8px" }}>
                       {sundays.map((_,i) => {
@@ -679,10 +711,107 @@ export default function EscalaMusicos() {
                       })}
                     </div>
                     <div style={{ fontSize:"11px", color }}>
-                      {m.count}x escalado • {m.offWeeks}x folga
+                      {m.count}x escalado {"\u2022"} {m.offWeeks}x folga
                     </div>
                     {m.leadsThisMonth > 0 && (
-                      <div style={{ fontSize:"10px", color: vc.tag, marginTop:"2px" }}>🎤 Lead {m.leadsThisMonth}x</div>
+                      <div style={{ fontSize:"10px", color: vc.tag, marginTop:"2px" }}>{"\u{1F3A4}"} Lead {m.leadsThisMonth}x</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {/* ── TAB: MÚSICOS ── */}
+        {activeTab === "musicos" && (
+          <div>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"20px" }}>
+              <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase" }}>{"\u{1F3B6}"} Gerenciar M\u00fasicos ({musicians.length})</div>
+              <button onClick={addMusician} style={{
+                ...actionBtnStyle, background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e", fontWeight:"700", padding:"8px 18px", fontSize:"12px"
+              }}>+ Adicionar M\u00fasico</button>
+            </div>
+            <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+              {musicians.map(m => {
+                const isEditing = editingMusician === m.id;
+                const vc = getVocalistColor(m.id);
+                const isVocalist = m.roles.includes("vocal_principal");
+                return (
+                  <div key={m.id} style={{
+                    background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"16px 20px",
+                    border: isVocalist ? `1px solid ${vc.border}` : "1px solid rgba(255,255,255,0.08)",
+                    borderLeft: isVocalist ? `3px solid ${vc.tag}` : "3px solid rgba(255,255,255,0.1)"
+                  }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom: isEditing ? "14px" : "0" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:"12px", flex:1 }}>
+                        {isVocalist && <span style={{ width:"10px", height:"10px", borderRadius:"50%", background: vc.tag, flexShrink:0 }} />}
+                        {isEditing ? (
+                          <div style={{ display:"flex", gap:"10px", flex:1, flexWrap:"wrap" }}>
+                            <div>
+                              <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"4px" }}>Nome Completo</div>
+                              <input value={m.name} onChange={e => updateMusician(m.id, { name: e.target.value })} style={inputStyle} />
+                            </div>
+                            <div>
+                              <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"4px" }}>Nome Curto</div>
+                              <input value={m.short} onChange={e => updateMusician(m.id, { short: e.target.value })} style={{...inputStyle, width:"120px"}} />
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <span style={{ fontWeight:"700", fontSize:"14px", color: isVocalist ? vc.text : "#f0e6d3" }}>{m.short}</span>
+                            {m.name !== m.short && <span style={{ fontSize:"12px", color:"rgba(255,255,255,0.35)", marginLeft:"8px" }}>{m.name}</span>}
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ display:"flex", gap:"6px", flexShrink:0, marginLeft:"12px" }}>
+                        <button onClick={() => setEditingMusician(isEditing ? null : m.id)} style={{
+                          background: isEditing ? "rgba(80,180,100,0.2)" : "rgba(201,169,110,0.15)", border: isEditing ? "1px solid rgba(80,180,100,0.3)" : "1px solid rgba(201,169,110,0.25)",
+                          color: isEditing ? "#80e880" : "#c9a96e", padding:"6px 14px", borderRadius:"8px", cursor:"pointer", fontSize:"11px", fontFamily:"Georgia, serif"
+                        }}>{isEditing ? "\u2713 Fechar" : "\u270E Editar"}</button>
+                        <button onClick={() => removeMusician(m.id)} style={{
+                          background:"rgba(220,80,80,0.1)", border:"1px solid rgba(220,80,80,0.2)",
+                          color:"#ff8080", padding:"6px 10px", borderRadius:"8px", cursor:"pointer", fontSize:"11px", fontFamily:"Georgia, serif"
+                        }}>{"\u2715"}</button>
+                      </div>
+                    </div>
+                    {/* Roles / Positions */}
+                    {isEditing && (
+                      <div>
+                        <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"8px" }}>Posi\u00e7\u00f5es</div>
+                        <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+                          {POSITIONS.map(pos => {
+                            const hasRole = m.roles.includes(pos.id);
+                            return (
+                              <button key={pos.id} onClick={() => toggleRole(m.id, pos.id)} style={{
+                                padding:"6px 14px", borderRadius:"20px", fontSize:"11px", fontWeight:"600", cursor:"pointer",
+                                fontFamily:"Georgia, serif", transition:"all 0.15s",
+                                background: hasRole ? `${pos.color}25` : "rgba(255,255,255,0.04)",
+                                border: hasRole ? `1px solid ${pos.color}55` : "1px solid rgba(255,255,255,0.1)",
+                                color: hasRole ? pos.color : "rgba(255,255,255,0.3)"
+                              }}>
+                                {pos.icon} {pos.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                    {/* Show roles summary when not editing */}
+                    {!isEditing && (
+                      <div style={{ display:"flex", gap:"4px", flexWrap:"wrap", marginTop:"8px" }}>
+                        {m.roles.map(roleId => {
+                          const pos = POSITIONS.find(p => p.id === roleId);
+                          return pos ? (
+                            <span key={roleId} style={{
+                              padding:"2px 8px", borderRadius:"12px", fontSize:"9px",
+                              background: `${pos.color}15`, border: `1px solid ${pos.color}33`, color: pos.color
+                            }}>
+                              {pos.icon} {pos.label}
+                            </span>
+                          ) : null;
+                        })}
+                        {m.roles.length === 0 && <span style={{ fontSize:"11px", color:"rgba(255,255,255,0.2)", fontStyle:"italic" }}>Nenhuma posi\u00e7\u00e3o definida</span>}
+                      </div>
                     )}
                   </div>
                 );
@@ -695,14 +824,14 @@ export default function EscalaMusicos() {
           <div>
             {conflicts.length === 0 ? (
               <div style={{ textAlign:"center", padding:"60px 20px", color:"#5bc85b", fontSize:"16px" }}>
-                ✅ Nenhum conflito encontrado!<br/>
-                <span style={{ fontSize:"13px", color:"rgba(255,255,255,0.3)", display:"block", marginTop:"8px" }}>A escala está respeitando todas as regras</span>
+                {"\u2705"} Nenhum conflito encontrado!<br/>
+                <span style={{ fontSize:"13px", color:"rgba(255,255,255,0.3)", display:"block", marginTop:"8px" }}>A escala est\u00e1 respeitando todas as regras</span>
               </div>
             ) : (
               <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                 {errors.map((c,i) => (
                   <div key={i} style={{ padding:"14px 18px", borderRadius:"10px", background:"rgba(220,60,60,0.12)", border:"1px solid rgba(220,60,60,0.3)", display:"flex", gap:"12px", alignItems:"flex-start" }}>
-                    <span style={{ fontSize:"18px" }}>🔴</span>
+                    <span style={{ fontSize:"18px" }}>{"\u{1F534}"}</span>
                     <div>
                       <div style={{ fontSize:"11px", color:"rgba(255,150,150,0.6)", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"2px" }}>Erro</div>
                       <div style={{ fontSize:"13px", color:"#ffaaaa" }}>{c.msg}</div>
@@ -711,9 +840,9 @@ export default function EscalaMusicos() {
                 ))}
                 {warnings.map((c,i) => (
                   <div key={i} style={{ padding:"14px 18px", borderRadius:"10px", background:"rgba(240,160,40,0.1)", border:"1px solid rgba(240,160,40,0.25)", display:"flex", gap:"12px", alignItems:"flex-start" }}>
-                    <span style={{ fontSize:"18px" }}>🟡</span>
+                    <span style={{ fontSize:"18px" }}>{"\u{1F7E1}"}</span>
                     <div>
-                      <div style={{ fontSize:"11px", color:"rgba(240,200,100,0.6)", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"2px" }}>Atenção</div>
+                      <div style={{ fontSize:"11px", color:"rgba(240,200,100,0.6)", textTransform:"uppercase", letterSpacing:"1px", marginBottom:"2px" }}>Aten\u00e7\u00e3o</div>
                       <div style={{ fontSize:"13px", color:"#ffd080" }}>{c.msg}</div>
                     </div>
                   </div>
@@ -723,25 +852,25 @@ export default function EscalaMusicos() {
             <div style={{ marginTop:"24px", background:"rgba(255,255,255,0.03)", borderRadius:"12px", padding:"16px 20px" }}>
               <div style={{ fontSize:"11px", letterSpacing:"3px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px" }}>Regras do Sistema</div>
               {[
-                "Cada músico deve ter pelo menos 1 folga por mês (exceto Hugo Luigi)",
-                "Ana Tiscianeli: máximo 1x por mês",
-                "Madalena: domingos alternados (1 sim, 1 não)",
+                "Cada m\u00fasico deve ter pelo menos 1 folga por m\u00eas (exceto Hugo Luigi)",
+                "Ana Tiscianeli: m\u00e1ximo 1x por m\u00eas",
+                "Madalena: domingos alternados (1 sim, 1 n\u00e3o)",
                 "Casais Asafe/Jokasta e Leandro/Aline: sempre folga juntos",
-                "Lead Vocal: rotação completa antes de repetir",
-                "Hugo e Leandro: quando vocal, automaticamente no violão",
-                "Teclado e Bateria: SEMPRE obrigatórios",
-                "Baixo, Guitarra e Violão: podem ficar vazios se necessário",
-                "Mínimo 2 back vocals por domingo",
+                "Lead Vocal: rota\u00e7\u00e3o completa antes de repetir",
+                "Hugo e Leandro: quando vocal, automaticamente no viol\u00e3o",
+                "Teclado e Bateria: SEMPRE obrigat\u00f3rios",
+                "Baixo, Guitarra e Viol\u00e3o: podem ficar vazios se necess\u00e1rio",
+                "M\u00ednimo 2 back vocals por domingo",
               ].map((r,i) => (
                 <div key={i} style={{ padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.05)", fontSize:"12px", color:"rgba(240,230,211,0.6)", display:"flex", gap:"8px" }}>
-                  <span style={{ color:"#c9a96e", fontSize:"14px" }}>✦</span>{r}
+                  <span style={{ color:"#c9a96e", fontSize:"14px" }}>{"\u2726"}</span>{r}
                 </div>
               ))}
             </div>
           </div>
         )}
         <div style={{ textAlign:"center", marginTop:"24px", fontSize:"10px", color:"rgba(255,255,255,0.2)", letterSpacing:"1px" }}>
-          Dados salvos automaticamente • HLSS Prime Services
+          Dados salvos automaticamente {"\u2022"} HLSS Prime Services
         </div>
       </div>
     </div>
@@ -759,4 +888,8 @@ const actionBtnStyle = {
 };
 const headerCellStyle = {
   padding:"12px 8px", background:"rgba(201,169,110,0.1)"
+};
+const inputStyle = {
+  background:"rgba(255,255,255,0.08)", border:"1px solid rgba(201,169,110,0.3)", borderRadius:"8px",
+  padding:"8px 12px", color:"#f0e6d3", fontSize:"13px", fontFamily:"Georgia, serif", outline:"none", width:"200px"
 };
