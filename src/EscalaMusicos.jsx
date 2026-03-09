@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { generateMusicianPDF, generateAllMusiciansPDF } from "./pdfReport.js";
+import { generateMusicianPDF, generateAllMusiciansPDF, generateCalendarPDF } from "./pdfReport.js";
 // ─── DEFAULT DATA ────────────────────────────────────────────────────────────
 const DEFAULT_MUSICIANS = [
   { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
@@ -1920,6 +1920,32 @@ export default function EscalaMusicos() {
                   >
                     {"\u{1F4E5}"} Baixar Relatório Completo ({selLabel})
                   </button>
+
+                  {/* ── LANDSCAPE CALENDAR PDF ── */}
+                  <div style={{ marginTop:"18px", borderTop:"1px solid rgba(255,255,255,0.06)", paddingTop:"16px" }}>
+                    <div style={{ fontSize:"9px", letterSpacing:"3px", color:"#69b4ff", textTransform:"uppercase", marginBottom:"10px", fontWeight:"700" }}>
+                      {"\u{1F4C5}"} Calendário Geral (Paisagem)
+                    </div>
+                    <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"12px" }}>
+                      PDF em formato paisagem com a escala completa colorida — ideal para imprimir e fixar.
+                    </div>
+                    <button disabled={!hasSelection} onClick={() => {
+                      try {
+                        const doc = generateCalendarPDF(filteredSchedules, musicians);
+                        if (doc) doc.save(`Escala_Geral_Calendario.pdf`);
+                      } catch(e) { console.error("Calendar PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
+                    }} style={{
+                      width:"100%", padding:"14px", borderRadius:"12px", border:"none", cursor: hasSelection ? "pointer" : "not-allowed",
+                      fontSize:"14px", fontWeight:"700", fontFamily:"Georgia, serif",
+                      background: hasSelection ? "linear-gradient(135deg,#69b4ff,#4080d0)" : "rgba(255,255,255,0.08)",
+                      color: hasSelection ? "#fff" : "rgba(255,255,255,0.3)", transition:"all 0.2s"
+                    }}
+                    onMouseEnter={e => { if (hasSelection) e.currentTarget.style.opacity = "0.9"; }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+                    >
+                      {"\u{1F5A8}\u{FE0F}"} Baixar Escala Geral - Calendário ({selLabel})
+                    </button>
+                  </div>
                 </div>
                 );
               })()}

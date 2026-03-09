@@ -622,3 +622,281 @@ export function generateAllMusiciansPDF(musicians, allSchedules, blockDates) {
 
   return doc;
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LANDSCAPE CALENDAR-ONLY PDF (general overview — no individual musician detail)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// RGB colors per musician (matching site VOCALIST_COLORS)
+const MUSICIAN_COLORS = {
+  hugo:     { bg: [232,168,56],  text: [232,168,56] },
+  jokasta:  { bg: [168,130,255], text: [168,130,255] },
+  matheu:   { bg: [91,200,175],  text: [91,200,175] },
+  leandro:  { bg: [105,180,255], text: [105,180,255] },
+  aline:    { bg: [255,130,180], text: [255,130,180] },
+  ana:      { bg: [255,200,100], text: [255,200,100] },
+  clivison: { bg: [152,217,130], text: [152,217,130] },
+  madalena: { bg: [255,140,105], text: [255,140,105] },
+  marcus:   { bg: [200,160,220], text: [200,160,220] },
+  wendell:  { bg: [180,200,140], text: [180,200,140] },
+  josh:     { bg: [140,190,210], text: [140,190,210] },
+  asafe:    { bg: [168,130,255], text: [168,130,255] },
+};
+const DEF_MC = { bg: [201,169,110], text: [201,169,110] };
+function getMC(id) { return MUSICIAN_COLORS[id] || DEF_MC; }
+
+// Position colors for row headers (matching site POSITIONS)
+const POS_COLORS = {
+  vocal_principal: [232,168,56],
+  vocal_back:      [155,138,255],
+  teclado:         [91,200,175],
+  violao:          [255,140,105],
+  baixo:           [105,180,255],
+  guitarra:        [255,105,180],
+  bateria:         [152,217,130],
+};
+
+const LANDSCAPE_POSITIONS = [
+  { id: "vocal_principal", label: "Vocal Principal", slots: 1 },
+  { id: "vocal_back",      label: "Back Vocal #1",   parentId: "vocal_back", slot: 0 },
+  { id: "vocal_back_1",    label: "Back Vocal #2",   parentId: "vocal_back", slot: 1 },
+  { id: "vocal_back_2",    label: "Back Vocal #3",   parentId: "vocal_back", slot: 2 },
+  { id: "teclado",         label: "Teclado" },
+  { id: "violao",          label: "Violão" },
+  { id: "baixo",           label: "Baixo" },
+  { id: "guitarra",        label: "Guitarra" },
+  { id: "bateria",         label: "Bateria" },
+];
+
+function fmt2(d) {
+  return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`;
+}
+
+function renderCalendarPage(doc, yr, mo, sched, musicians, pageNum) {
+  const LW = 297, LH = 210;
+  const LML = 14, LMR = 14;
+  const LCW = LW - LML - LMR;
+
+  const sundays = getSundays(yr, mo);
+  const monthLabel = `${MONTHS_PT[mo]} ${yr}`;
+  const getName = (id) => {
+    const m = musicians.find(x => x.id === id);
+    return m ? m.short : (id || "");
+  };
+
+  // ── Gold top accent
+  doc.setFillColor(...GOLD);
+  doc.rect(0, 0, LW, 2.5, "F");
+
+  // ── Header
+  let y = 12;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY_400);
+  doc.text("MINISTÉRIO DE LOUVOR  |  ESCALA DE MÚSICOS", LML, y);
+  doc.text("VERBO DA VIDA ORLANDO", LW - LMR, y, { align: "right" });
+
+  y += 2;
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.3);
+  doc.line(LML, y, LW - LMR, y);
+
+  y += 7;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(...NAVY);
+  doc.text("Escala Geral", LML, y);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(13);
+  doc.setTextColor(...GOLD_DARK);
+  doc.text(monthLabel, LW - LMR, y, { align: "right" });
+
+  y += 2.5;
+  doc.setDrawColor(...GOLD);
+  doc.setLineWidth(1);
+  doc.line(LML, y, LML + 38, y);
+
+  y += 5;
+
+  // ── Calendar grid
+  const labelColW = 36;
+  const numSundays = sundays.length;
+  const sundayColW = (LCW - labelColW) / numSundays;
+  const headerH = 14;
+  const totalRows = LANDSCAPE_POSITIONS.length; // 9
+  const availH = LH - y - 14; // footer space
+  const rowH = Math.min(Math.floor(availH / totalRows * 10) / 10, 15);
+  const tableH = headerH + totalRows * rowH;
+
+  // Outer border
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.4);
+  doc.rect(LML, y, LCW, tableH);
+
+  // ── Column headers (Sundays)
+  doc.setFillColor(...NAVY);
+  doc.rect(LML, y, LCW, headerH, "F");
+
+  // Position label header
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GOLD_LT);
+  doc.text("POSIÇÃO", LML + labelColW / 2, y + 8.5, { align: "center" });
+
+  // Sunday column headers with lead color stripe
+  sundays.forEach((s, i) => {
+    const colX = LML + labelColW + i * sundayColW;
+    const cx = colX + sundayColW / 2;
+
+    // Lead vocalist color stripe
+    const leadId = sched[`${i}-vocal_principal-0`];
+    if (leadId) {
+      const mc = getMC(leadId);
+      doc.setFillColor(...mc.bg);
+      doc.rect(colX, y + headerH - 2.5, sundayColW, 2.5, "F");
+    }
+
+    // Column dividers in header
+    if (i > 0) {
+      doc.setDrawColor(50, 60, 80);
+      doc.setLineWidth(0.1);
+      doc.line(colX, y, colX, y + headerH);
+    }
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...GOLD_LT);
+    doc.text(`DOM ${i + 1}`, cx, y + 4.5, { align: "center" });
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...WHITE);
+    doc.text(fmt2(s), cx, y + 10.5, { align: "center" });
+  });
+
+  y += headerH;
+
+  // ── Data rows
+  LANDSCAPE_POSITIONS.forEach((pos, ri) => {
+    const rowY = y + ri * rowH;
+    const posBaseId = pos.parentId || pos.id;
+    const slotIdx = pos.slot !== undefined ? pos.slot : 0;
+    const posColor = POS_COLORS[posBaseId] || GRAY_500;
+
+    // Alternating row background
+    doc.setFillColor(...(ri % 2 === 0 ? [248, 249, 251] : WHITE));
+    doc.rect(LML, rowY, LCW, rowH, "F");
+
+    // Row bottom border
+    doc.setDrawColor(...GRAY_200);
+    doc.setLineWidth(0.15);
+    doc.line(LML, rowY + rowH, LML + LCW, rowY + rowH);
+
+    // Position label with color accent bar
+    doc.setFillColor(...posColor);
+    doc.rect(LML, rowY, 2, rowH, "F");
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.setTextColor(...posColor);
+    doc.text(pos.label, LML + 5, rowY + rowH / 2 + 1);
+
+    // Vertical divider after label
+    doc.setDrawColor(...GRAY_200);
+    doc.setLineWidth(0.3);
+    doc.line(LML + labelColW, rowY, LML + labelColW, rowY + rowH);
+
+    // Cell values
+    sundays.forEach((_, si) => {
+      const cellX = LML + labelColW + si * sundayColW;
+      const cx = cellX + sundayColW / 2;
+      const assignedId = sched[`${si}-${posBaseId}-${slotIdx}`];
+
+      // Vertical column divider
+      if (si > 0) {
+        doc.setDrawColor(...GRAY_200);
+        doc.setLineWidth(0.1);
+        doc.line(cellX, rowY, cellX, rowY + rowH);
+      }
+
+      if (assignedId) {
+        const mc = getMC(assignedId);
+        const name = getName(assignedId);
+
+        // Colored cell background (light tint)
+        doc.setFillColor(
+          Math.round(255 - (255 - mc.bg[0]) * 0.15),
+          Math.round(255 - (255 - mc.bg[1]) * 0.15),
+          Math.round(255 - (255 - mc.bg[2]) * 0.15)
+        );
+        doc.rect(cellX + 0.5, rowY + 0.5, sundayColW - 1, rowH - 1, "F");
+
+        // Left color accent in cell
+        doc.setFillColor(...mc.bg);
+        doc.rect(cellX + 0.5, rowY + 0.5, 1.5, rowH - 1, "F");
+
+        // Musician name
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(
+          Math.round(mc.text[0] * 0.6),
+          Math.round(mc.text[1] * 0.6),
+          Math.round(mc.text[2] * 0.6)
+        );
+
+        let display = name;
+        while (doc.getTextWidth(display) > sundayColW - 6 && display.length > 3) {
+          display = display.slice(0, -2) + "..";
+        }
+        doc.text(display, cx + 1, rowY + rowH / 2 + 1, { align: "center" });
+
+        // LEAD sub-label for vocal principal
+        if (posBaseId === "vocal_principal") {
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(5);
+          doc.setTextColor(
+            Math.round(mc.text[0] * 0.7),
+            Math.round(mc.text[1] * 0.7),
+            Math.round(mc.text[2] * 0.7)
+          );
+          doc.text("LEAD", cx + 1, rowY + rowH / 2 + 4.5, { align: "center" });
+        }
+      } else {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(...GRAY_200);
+        doc.text("-", cx, rowY + rowH / 2 + 1, { align: "center" });
+      }
+    });
+  });
+
+  // ── Footer
+  const footerY = LH - 7;
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.2);
+  doc.line(LML, footerY - 2, LW - LMR, footerY - 2);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(...GRAY_400);
+  doc.text(`Gerado em ${nowStr()}  |  Escala de Músicos  |  Verbo da Vida Orlando`, LML, footerY);
+  doc.text(`Página ${pageNum}`, LW - LMR, footerY, { align: "right" });
+}
+
+export function generateCalendarPDF(allSchedules, musicians) {
+  const monthKeys = Object.keys(allSchedules)
+    .filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
+
+  if (monthKeys.length === 0) return null;
+
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  doc.setProperties({ title: "Escala Geral — Calendário", author: "Escala de Músicos — Verbo da Vida Orlando" });
+
+  monthKeys.forEach((mk, idx) => {
+    const [yStr, mStr] = mk.split("-");
+    if (idx > 0) doc.addPage("a4", "landscape");
+    renderCalendarPage(doc, parseInt(yStr), parseInt(mStr), allSchedules[mk], musicians, idx + 1);
+  });
+
+  return doc;
+}
