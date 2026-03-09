@@ -386,9 +386,9 @@ function drawDetailTable(doc, sundays, schedule, musicianId, musicians, startY) 
       const names = [];
       for (let s = 0; s < maxSlots; s++) {
         const aid = schedule[`${si}-${pid}-${s}`];
-        if (aid) names.push(getName(aid) + (aid === musicianId ? " \u2605" : ""));
+        if (aid) names.push(getName(aid) + (aid === musicianId ? " *" : ""));
       }
-      lineup[pid] = names.length > 0 ? names.join(", ") : "\u2014";
+      lineup[pid] = names.length > 0 ? names.join(", ") : "-";
     });
 
     entries.push({ sun, isLead, lineup });
@@ -398,7 +398,7 @@ function drawDetailTable(doc, sundays, schedule, musicianId, musicians, startY) 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(...GRAY_400);
-    doc.text("Nenhuma escala\u00e7\u00e3o neste m\u00eas.", ML, y + 4);
+    doc.text("Nenhuma escalação neste mês.", ML, y + 4);
     return y + 10;
   }
 
@@ -406,13 +406,13 @@ function drawDetailTable(doc, sundays, schedule, musicianId, musicians, startY) 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...NAVY);
-  doc.text("ESCALA\u00c7\u00c3O COMPLETA POR DOMINGO", ML, y);
+  doc.text("ESCALAÇÃO COMPLETA POR DOMINGO", ML, y);
 
   // Legend
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
   doc.setTextColor(...GRAY_500);
-  doc.text("\u2605 = voc\u00ea", ML + CW - 12, y, { align: "right" });
+  doc.text("* = você", ML + CW - 12, y, { align: "right" });
   y += 5;
 
   const posKeys = Object.keys(POS_META);
@@ -475,16 +475,16 @@ function drawDetailTable(doc, sundays, schedule, musicianId, musicians, startY) 
 
         // Musician name(s)
         const nameStr = lineup[pid];
-        const hasMe = nameStr.includes("\u2605");
+        const hasMe = nameStr.includes("*");
         doc.setFont("helvetica", hasMe ? "bold" : "normal");
         doc.setFontSize(6);
-        doc.setTextColor(...(nameStr === "\u2014" ? GRAY_400 : GRAY_700));
+        doc.setTextColor(...(nameStr === "-" ? GRAY_400 : GRAY_700));
 
         // Truncate if too long for column
         const maxTextW = colW - 4;
         let display = nameStr;
         while (doc.getTextWidth(display) > maxTextW && display.length > 3) {
-          display = display.slice(0, -2) + "\u2026";
+          display = display.slice(0, -2) + "...";
         }
         doc.text(display, x, y + 5.8);
       }
