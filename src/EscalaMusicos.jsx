@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { generateMusicianPDF, generateAllMusiciansPDF } from "./pdfReport.js";
 // ─── DEFAULT DATA ────────────────────────────────────────────────────────────
 const DEFAULT_MUSICIANS = [
   { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
@@ -1754,6 +1755,54 @@ export default function EscalaMusicos() {
                   })}
                 </div>
               </div>
+
+              {/* ── PDF REPORTS SECTION ── */}
+              {allMonthKeys.length > 0 && (
+                <div style={cardStyle}>
+                  {sectionTitle("\u{1F4C4}", "Relatórios PDF por Músico")}
+                  <div style={{ fontSize:"12px", color:"rgba(240,230,211,0.5)", marginBottom:"14px" }}>
+                    Gere relatórios profissionais em PDF com calendário, estatísticas e detalhamento por domingo.
+                  </div>
+                  <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"8px", marginBottom:"16px" }}>
+                    {musicians.filter(m => !m.manualOnly).map(m => {
+                      const vc = getVocalistColor(m.id);
+                      return (
+                        <button key={m.id} onClick={() => {
+                          try {
+                            const doc = generateMusicianPDF(m, allSchedules, blockDates || {});
+                            if (doc) doc.save(`Relatorio_${m.short.replace(/\s+/g,"_")}.pdf`);
+                          } catch(e) { console.error("PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
+                        }} style={{
+                          padding:"10px 12px", borderRadius:"10px", border:`1px solid ${vc.border}`, borderLeft:`3px solid ${vc.tag}`,
+                          background:"rgba(255,255,255,0.02)", cursor:"pointer", textAlign:"left", fontFamily:"Georgia, serif",
+                          transition:"all 0.2s"
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
+                        >
+                          <div style={{ fontSize:"13px", fontWeight:"700", color: vc.text, marginBottom:"4px" }}>{m.short}</div>
+                          <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)" }}>{"\u{1F4E5}"} Baixar PDF</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button onClick={() => {
+                    try {
+                      const doc = generateAllMusiciansPDF(musicians, allSchedules, blockDates || {});
+                      if (doc) doc.save("Relatorio_Completo_Todos_Musicos.pdf");
+                    } catch(e) { console.error("PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
+                  }} style={{
+                    width:"100%", padding:"14px", borderRadius:"12px", border:"none", cursor:"pointer", fontSize:"14px", fontWeight:"700",
+                    fontFamily:"Georgia, serif", background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e",
+                    transition:"all 0.2s"
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity = "0.9"; }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+                  >
+                    {"\u{1F4E5}"} Baixar Relatório Completo (Todos os Músicos)
+                  </button>
+                </div>
+              )}
 
               {allMonthKeys.length === 0 && (
                 <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(240,230,211,0.3)", fontSize:"15px" }}>
