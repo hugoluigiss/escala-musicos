@@ -1,54 +1,61 @@
 /**
- * Escala de Músicos — PDF Report Generator (Client-side)
- * Professional reports with calendar view, stats, and position details.
- * Ported from Python reportlab to jsPDF.
+ * Escala de Músicos — PDF Report Generator
+ * Clean, professional, light-themed layout (Word-to-PDF style).
+ * One page per month with calendar, stats, positions, and detail table.
  */
 import { jsPDF } from "jspdf";
 
-// ─── CONFIG ──────────────────────────────────────────────────────────────────
-const W = 210; // A4 width mm
-const H = 297; // A4 height mm
-const MX = 30; // margin X in mm
+// ─── PAGE CONFIG ─────────────────────────────────────────────────────────────
+const W = 210, H = 297; // A4 mm
+const ML = 18, MR = 18; // left/right margins
+const CW = W - ML - MR; // content width = 174mm
 
-// Colors [R, G, B] 0-255
-const BG        = [13, 11, 30];
-const CARD_BG   = [20, 16, 40];
-const CARD_BD   = [30, 24, 64];
-const GOLD      = [201, 169, 110];
-const GOLD_DIM  = [138, 109, 59];
-const TXT       = [240, 230, 211];
-const TXT_DIM   = [138, 128, 144];
-const TXT_DMR   = [90, 80, 96];
-const GREEN     = [91, 200, 91];
-const GREEN_BG  = [26, 46, 26];
-const RED       = [255, 96, 96];
-const RED_BG    = [46, 26, 26];
-const BLUE      = [105, 180, 255];
-const BLUE_BG   = [26, 30, 46];
-const ORANGE    = [255, 140, 105];
-const ORANGE_BG = [46, 30, 26];
+// ─── COLOR PALETTE (professional light theme) ────────────────────────────────
+const NAVY      = [30, 41, 59];
+const NAVY_MED  = [51, 65, 85];
+const NAVY_LT   = [100, 116, 139];
+const GOLD_DARK = [161, 128, 68];
+const GOLD      = [180, 144, 80];
+const GOLD_LT   = [220, 195, 150];
+const GRAY_900  = [30, 30, 35];
+const GRAY_700  = [55, 65, 81];
+const GRAY_500  = [107, 114, 128];
+const GRAY_400  = [156, 163, 175];
+const GRAY_200  = [229, 231, 235];
+const GRAY_100  = [243, 244, 246];
+const GRAY_50   = [249, 250, 251];
+const WHITE     = [255, 255, 255];
+const GREEN_D   = [22, 101, 52];
+const GREEN_BG  = [220, 252, 231];
+const RED_D     = [153, 27, 27];
+const RED_BG    = [254, 226, 226];
+const BLUE_D    = [30, 64, 175];
+const BLUE_BG   = [219, 234, 254];
+const AMBER_D   = [146, 64, 14];
+const AMBER_BG  = [254, 243, 199];
 
+// Accent colors per musician (for subtle header accent)
 const VC_MAP = {
-  hugo:     { tag: [232,168,56],  bg: [46,37,16] },
-  jokasta:  { tag: [168,130,255], bg: [30,21,48] },
-  matheu:   { tag: [91,200,175],  bg: [21,37,32] },
-  leandro:  { tag: [105,180,255], bg: [21,30,46] },
-  aline:    { tag: [255,130,180], bg: [46,21,32] },
-  ana:      { tag: [255,200,100], bg: [46,34,16] },
-  clivison: { tag: [152,217,130], bg: [26,46,24] },
-  madalena: { tag: [255,140,105], bg: [46,30,21] },
+  hugo:     { accent: [180,130,40] },
+  jokasta:  { accent: [130,100,200] },
+  matheu:   { accent: [50,160,140] },
+  leandro:  { accent: [60,130,210] },
+  aline:    { accent: [200,80,130] },
+  ana:      { accent: [200,155,60] },
+  clivison: { accent: [80,170,90] },
+  madalena: { accent: [210,110,70] },
 };
-const DEF_VC = { tag: [201,169,110], bg: [30,26,16] };
+const DEF_VC = { accent: GOLD };
 function getVC(id) { return VC_MAP[id] || DEF_VC; }
 
 const POS_META = {
-  vocal_principal: { label: "Vocal Principal", color: [232,168,56] },
-  vocal_back:      { label: "Back Vocal",      color: [155,138,255] },
-  teclado:         { label: "Teclado",         color: [91,200,175] },
-  violao:          { label: "Violão",          color: [255,140,105] },
-  baixo:           { label: "Baixo",           color: [105,180,255] },
-  guitarra:        { label: "Guitarra",        color: [255,105,180] },
-  bateria:         { label: "Bateria",         color: [152,217,130] },
+  vocal_principal: { label: "Vocal Principal", color: [180,130,40] },
+  vocal_back:      { label: "Back Vocal",      color: [110,90,190] },
+  teclado:         { label: "Teclado",         color: [40,150,135] },
+  violao:          { label: "Violão",          color: [200,110,60] },
+  baixo:           { label: "Baixo",           color: [50,120,200] },
+  guitarra:        { label: "Guitarra",        color: [190,60,130] },
+  bateria:         { label: "Bateria",         color: [70,160,80] },
 };
 
 const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
@@ -56,10 +63,6 @@ const MONTHS_PT = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho",
 const DAYS_PT = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
-function blend(color, alpha) {
-  return color.map((c, i) => Math.round(c * alpha + BG[i] * (1 - alpha)));
-}
-
 function getSundays(year, month) {
   const sundays = [];
   const d = new Date(year, month, 1);
@@ -75,7 +78,7 @@ function dateKey(d) {
 function getMonthCalendar(year, month) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const offset = firstDay === 0 ? 6 : firstDay - 1; // Monday-first
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
   const weeks = [];
   let week = new Array(7).fill(0);
   let day = 1;
@@ -89,324 +92,307 @@ function getMonthCalendar(year, month) {
   return weeks;
 }
 
-function rr(doc, x, y, w, h, r, fill, stroke, sw) {
-  if (fill) {
-    doc.setFillColor(...fill);
-    doc.roundedRect(x, y, w, h, r, r, "F");
-  }
-  if (stroke) {
-    doc.setDrawColor(...stroke);
-    doc.setLineWidth(sw || 0.15);
-    doc.roundedRect(x, y, w, h, r, r, "S");
-  }
-}
-
 function nowStr() {
   const d = new Date();
   return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
 }
 
-// ─── DRAW BACKGROUND ────────────────────────────────────────────────────────
-function drawBackground(doc) {
-  doc.setFillColor(...BG);
-  doc.rect(0, 0, W, H, "F");
-  // Subtle glow top-left
-  doc.setFillColor(...blend(GOLD, 0.04));
-  doc.circle(W * 0.2, H * 0.15, 70, "F");
-  // Subtle glow bottom-right
-  doc.setFillColor(...blend([100, 80, 180], 0.05));
-  doc.circle(W * 0.8, H * 0.85, 85, "F");
-}
-
-// ─── DRAW HEADER ─────────────────────────────────────────────────────────────
+// ─── DRAW: HEADER ────────────────────────────────────────────────────────────
 function drawHeader(doc, musician, monthLabel, vc) {
-  let y = 25;
-  // Ministry subtitle
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(...GOLD_DIM);
-  doc.text("MINISTÉRIO DE LOUVOR", W / 2, y, { align: "center" });
+  let y = 14;
 
-  // Name
+  // Gold accent bar at very top
+  doc.setFillColor(...GOLD);
+  doc.rect(0, 0, W, 3, "F");
+
+  // Ministry name
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7.5);
+  doc.setTextColor(...GRAY_400);
+  doc.text("MINISTÉRIO DE LOUVOR  |  ESCALA DE MÚSICOS", ML, y);
+
+  // HLSS Prime right
+  doc.text("HLSS PRIME SERVICES", W - MR, y, { align: "right" });
+
+  // Thin line below
+  y += 2.5;
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.3);
+  doc.line(ML, y, W - MR, y);
+
+  // Musician name
   y += 8;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.setTextColor(...TXT);
-  doc.text(`✦  ${musician.name}  ✦`, W / 2, y, { align: "center" });
+  doc.setFontSize(18);
+  doc.setTextColor(...NAVY);
+  doc.text(musician.name, ML, y);
 
-  // Gold line
-  y += 4;
-  doc.setDrawColor(...GOLD);
-  doc.setLineWidth(0.2);
-  doc.line(W / 2 - 22, y, W / 2 + 22, y);
-
-  // Month/year
-  y += 7;
+  // Month/year right-aligned
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(...GOLD);
-  doc.text(monthLabel, W / 2, y, { align: "center" });
+  doc.setFontSize(12);
+  doc.setTextColor(...GOLD_DARK);
+  doc.text(monthLabel, W - MR, y, { align: "right" });
 
-  // Colored accent
-  y += 4;
-  doc.setDrawColor(...vc.tag);
-  doc.setLineWidth(0.7);
-  doc.line(W / 2 - 28, y, W / 2 + 28, y);
-
-  return y + 6;
-}
-
-// ─── DRAW LEGEND ─────────────────────────────────────────────────────────────
-function drawLegend(doc, vc, startY) {
-  let y = startY;
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.5);
-  doc.setTextColor(...GOLD_DIM);
-  doc.text("LEGENDA:", MX, y);
-
-  const items = [
-    { color: vc.tag, label: "Lead Vocal" },
-    { color: vc.bg,  label: "Escalado" },
-    { color: BLUE,   label: "Folga" },
-    { color: RED,    label: "Bloqueado" },
-  ];
-  let x = MX + 28;
-  items.forEach(item => {
-    doc.setFillColor(...item.color);
-    doc.circle(x + 1.5, y - 1.2, 1.2, "F");
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.setTextColor(...TXT_DIM);
-    doc.text(item.label, x + 4.5, y);
-    x += 26;
-  });
+  // Colored accent line under name
+  y += 3;
+  doc.setDrawColor(...vc.accent);
+  doc.setLineWidth(1);
+  doc.line(ML, y, ML + 45, y);
 
   return y + 5;
 }
 
-// ─── DRAW CALENDAR ──────────────────────────────────────────────────────────
+// ─── DRAW: STATS ROW ─────────────────────────────────────────────────────────
+function drawStats(doc, stats, startY) {
+  const y = startY;
+  const items = [
+    { val: stats.scheduled, label: "Escalado", bg: GRAY_50,   border: GRAY_200, numColor: NAVY,   labelColor: GRAY_500 },
+    { val: stats.folgas,    label: "Folgas",   bg: BLUE_BG,   border: [191,219,254], numColor: BLUE_D, labelColor: BLUE_D },
+    { val: stats.leads,     label: "Lead",     bg: AMBER_BG,  border: [253,230,138], numColor: AMBER_D,labelColor: AMBER_D },
+    { val: stats.blocked,   label: "Bloqueios",bg: RED_BG,    border: [254,202,202], numColor: RED_D,  labelColor: RED_D },
+  ];
+  const gap = 4;
+  const cardW = (CW - gap * (items.length - 1)) / items.length;
+  const cardH = 14;
+
+  items.forEach((item, i) => {
+    const x = ML + i * (cardW + gap);
+    doc.setFillColor(...item.bg);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "F");
+    doc.setDrawColor(...item.border);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(x, y, cardW, cardH, 2, 2, "S");
+
+    // Number
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(...item.numColor);
+    doc.text(String(item.val), x + 8, y + 9.5);
+
+    // Label
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...item.labelColor);
+    doc.text(item.label, x + 22, y + 9.5);
+  });
+
+  return y + cardH + 4;
+}
+
+// ─── DRAW: CALENDAR ──────────────────────────────────────────────────────────
 function drawCalendar(doc, year, monthIdx, sundays, musicianSundays, blockedDates, leadSundays, vc, startY) {
   const weeks = getMonthCalendar(year, monthIdx);
-  const calW = W - 2 * MX;
-  const cellW = calW / 7;
-  const cellH = 13;
-  const headerH = 8;
+  const cellW = CW / 7;
+  const cellH = 9.5;
+  const headerH = 6;
 
   const sundayDays = new Set(sundays.map(s => s.getDate()));
   const musicianDays = new Set(musicianSundays.map(s => s.getDate()));
   const blockedDays = new Set(blockedDates.map(s => s.getDate()));
   const leadDays = new Set(leadSundays.map(s => s.getDate()));
 
-  // Card background
-  const totalH = headerH + weeks.length * cellH + 5;
-  rr(doc, MX - 2, startY - 2, calW + 4, totalH + 4, 3, CARD_BG, CARD_BD, 0.15);
+  let y = startY;
 
-  // Day headers
-  let y = startY + headerH - 2;
-  DAYS_PT.forEach((name, i) => {
-    const cx = MX + i * cellW + cellW / 2;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.setTextColor(...(i === 6 ? GOLD : TXT_DIM));
-    doc.text(name, cx, y, { align: "center" });
+  // Section title
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  doc.text("CALENDÁRIO", ML, y);
+
+  // Legend inline
+  const legendItems = [
+    { color: vc.accent, label: "Lead" },
+    { color: [200,220,240], label: "Escalado" },
+    { color: [254,202,202], label: "Bloqueado" },
+  ];
+  let lx = ML + 120;
+  legendItems.forEach(item => {
+    doc.setFillColor(...item.color);
+    doc.rect(lx, y - 2.5, 3, 3, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...GRAY_500);
+    doc.text(item.label, lx + 4.5, y);
+    lx += 22;
   });
 
-  // Separator
-  y += 2;
-  doc.setDrawColor(...blend(GOLD, 0.15));
-  doc.setLineWidth(0.1);
-  doc.line(MX, y, MX + calW, y);
+  y += 3;
+
+  // Table border
+  const totalH = headerH + weeks.length * cellH;
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.3);
+  doc.rect(ML, y, CW, totalH);
+
+  // Day headers background
+  doc.setFillColor(...NAVY);
+  doc.rect(ML, y, CW, headerH, "F");
+
+  DAYS_PT.forEach((name, i) => {
+    const cx = ML + i * cellW + cellW / 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...(i === 6 ? GOLD_LT : WHITE));
+    doc.text(name, cx, y + 4.2, { align: "center" });
+  });
+
+  y += headerH;
+
+  // Grid lines
+  for (let i = 1; i < 7; i++) {
+    doc.setDrawColor(...GRAY_200);
+    doc.setLineWidth(0.15);
+    doc.line(ML + i * cellW, y, ML + i * cellW, y + weeks.length * cellH);
+  }
 
   // Draw days
-  y += 3;
-  weeks.forEach(week => {
+  weeks.forEach((week, wi) => {
+    if (wi > 0) {
+      doc.setDrawColor(...GRAY_200);
+      doc.setLineWidth(0.15);
+      doc.line(ML, y, ML + CW, y);
+    }
+
     week.forEach((day, i) => {
       if (day === 0) return;
-      const cx = MX + i * cellW + cellW / 2;
-      const cy = y + cellH / 2;
-      const rx = MX + i * cellW + 1;
-      const ry = y + 0.5;
-      const rw = cellW - 2;
-      const rh = cellH - 1;
-
+      const cx = ML + i * cellW + cellW / 2;
+      const cellX = ML + i * cellW;
       const isSunday = sundayDays.has(day);
       const isScheduled = musicianDays.has(day);
       const isBlocked = blockedDays.has(day);
       const isLead = leadDays.has(day);
 
-      // Cell backgrounds
+      // Cell background
       if (isBlocked && isSunday) {
-        rr(doc, rx, ry, rw, rh, 2, RED_BG, blend(RED, 0.4), 0.15);
+        doc.setFillColor(...RED_BG);
+        doc.rect(cellX + 0.2, y + 0.2, cellW - 0.4, cellH - 0.4, "F");
       } else if (isLead) {
-        rr(doc, rx, ry, rw, rh, 2, vc.tag, null);
+        doc.setFillColor(...vc.accent);
+        doc.rect(cellX + 0.2, y + 0.2, cellW - 0.4, cellH - 0.4, "F");
       } else if (isScheduled) {
-        rr(doc, rx, ry, rw, rh, 2, vc.bg, blend(vc.tag, 0.4), 0.15);
-      } else if (isSunday && !isScheduled) {
-        rr(doc, rx, ry, rw, rh, 2, blend([255,255,255], 0.03), null);
+        doc.setFillColor(210, 225, 245);
+        doc.rect(cellX + 0.2, y + 0.2, cellW - 0.4, cellH - 0.4, "F");
       }
 
       // Day number
       doc.setFont("helvetica", isSunday ? "bold" : "normal");
-      doc.setFontSize(isSunday ? 10 : 8);
-      if (isLead) doc.setTextColor(...BG);
-      else if (isBlocked && isSunday) doc.setTextColor(...RED);
-      else if (isScheduled) doc.setTextColor(...vc.tag);
-      else if (isSunday) doc.setTextColor(...TXT_DIM);
-      else doc.setTextColor(...TXT_DMR);
-      doc.text(String(day), cx, cy + 0.5, { align: "center" });
+      doc.setFontSize(isSunday ? 8.5 : 7.5);
+      if (isLead) doc.setTextColor(...WHITE);
+      else if (isBlocked && isSunday) doc.setTextColor(...RED_D);
+      else if (isScheduled) doc.setTextColor(...NAVY);
+      else if (isSunday) doc.setTextColor(...NAVY_MED);
+      else doc.setTextColor(...GRAY_400);
+      doc.text(String(day), cx, y + 4.5, { align: "center" });
 
-      // Labels
+      // Sub-label
       if (isLead) {
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(4.5);
-        doc.setTextColor(...BG);
-        doc.text("LEAD", cx, cy + 4, { align: "center" });
+        doc.setFontSize(4);
+        doc.setTextColor(...WHITE);
+        doc.text("LEAD", cx, y + 7.8, { align: "center" });
       } else if (isBlocked && isSunday) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(4);
-        doc.setTextColor(...RED);
-        doc.text("BLOQUEADO", cx, cy + 4, { align: "center" });
-      } else if (isScheduled) {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(4);
-        doc.setTextColor(...blend(vc.tag, 0.6));
-        doc.text("ESCALADO", cx, cy + 4, { align: "center" });
+        doc.setFontSize(3.5);
+        doc.setTextColor(...RED_D);
+        doc.text("BLOQ.", cx, y + 7.8, { align: "center" });
       } else if (isSunday && !isScheduled) {
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(4);
-        doc.setTextColor(...TXT_DMR);
-        doc.text("FOLGA", cx, cy + 4, { align: "center" });
+        doc.setFontSize(3.5);
+        doc.setTextColor(...GRAY_400);
+        doc.text("Folga", cx, y + 7.8, { align: "center" });
       }
     });
     y += cellH;
   });
 
-  return startY + totalH + 4;
+  return startY + 3 + headerH + weeks.length * cellH + 4;
 }
 
-// ─── DRAW STATS CARDS ───────────────────────────────────────────────────────
-function drawStatsCards(doc, stats, vc, startY) {
-  const totalW = W - 2 * MX;
-  const gap = 2.5;
-  const count = 4;
-  const cardW = (totalW - gap * (count - 1)) / count;
-  const cardH = 18;
+// ─── DRAW: POSITIONS ─────────────────────────────────────────────────────────
+function drawPositions(doc, positionsPlayed, musicianRoles, startY) {
   let y = startY;
-
-  const items = [
-    { val: stats.scheduled, label: "ESCALADO", color: vc.tag, bg: vc.bg },
-    { val: stats.folgas,    label: "FOLGAS",   color: BLUE,   bg: BLUE_BG },
-    { val: stats.leads,     label: "LEAD VOCAL", color: GOLD, bg: [46,37,16] },
-    { val: stats.blocked,   label: "BLOQUEIOS", color: ORANGE, bg: ORANGE_BG },
-  ];
-
-  items.forEach((item, i) => {
-    const x = MX + i * (cardW + gap);
-    rr(doc, x, y, cardW, cardH, 2.5, item.bg, blend(item.color, 0.2), 0.12);
-
-    // Big number
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(18);
-    doc.setTextColor(...item.color);
-    doc.text(String(item.val), x + cardW / 2, y + 10, { align: "center" });
-
-    // Label
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(5.5);
-    doc.setTextColor(...TXT_DIM);
-    doc.text(item.label, x + cardW / 2, y + 15.5, { align: "center" });
-  });
-
-  return y + cardH + 5;
-}
-
-// ─── DRAW POSITION BREAKDOWN ────────────────────────────────────────────────
-function drawPositions(doc, positionsPlayed, musicianRoles, vc, startY) {
-  const totalW = W - 2 * MX;
-  const rowH = 8;
-
-  // Section title
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GOLD);
-  let y = startY;
-  doc.text("ATUAÇÃO POR POSIÇÃO", MX, y);
-  y += 3;
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  doc.text("POSIÇÕES", ML, y);
+  y += 4;
 
   const roles = Object.keys(POS_META).filter(pid => musicianRoles.includes(pid));
-  const cardH = roles.length * rowH + 6;
-  rr(doc, MX - 2, y - 1, totalW + 4, cardH + 2, 3, CARD_BG, CARD_BD, 0.15);
-
-  y += 3;
   const maxCount = Math.max(1, ...Object.values(positionsPlayed));
+  const barMaxW = 50;
+  const rowH = 6;
 
   roles.forEach(pid => {
     const meta = POS_META[pid];
     const cnt = positionsPlayed[pid] || 0;
 
-    // Label
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...meta.color);
-    doc.text(meta.label, MX + 2, y + 2);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY_700);
+    doc.text(meta.label, ML, y + 2);
+
+    // Bar background
+    const barX = ML + 42;
+    doc.setFillColor(...GRAY_100);
+    doc.roundedRect(barX, y - 0.5, barMaxW, 4, 1.5, 1.5, "F");
+
+    // Bar fill
+    if (cnt > 0) {
+      const fillW = Math.max((cnt / maxCount) * barMaxW, 2);
+      doc.setFillColor(...meta.color);
+      doc.roundedRect(barX, y - 0.5, fillW, 4, 1.5, 1.5, "F");
+    }
 
     // Count
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text(`${cnt}x`, MX + totalW - 2, y + 2, { align: "right" });
-
-    // Bar background
-    const barX = MX + 40;
-    const barW = totalW - 55;
-    const barH = 3;
-    const barY = y;
-    rr(doc, barX, barY, barW, barH, 1.5, blend([255,255,255], 0.04), null);
-
-    // Bar fill
-    if (cnt > 0 && maxCount > 0) {
-      const fillW = Math.max((cnt / maxCount) * barW, 2);
-      rr(doc, barX, barY, fillW, barH, 1.5, blend(meta.color, 0.55), null);
-    }
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY_700);
+    doc.text(`${cnt}x`, barX + barMaxW + 4, y + 2);
 
     y += rowH;
   });
 
-  return y + 4;
+  return y + 2;
 }
 
-// ─── DRAW SUNDAY DETAIL TABLE ───────────────────────────────────────────────
-function drawSundayDetails(doc, sundays, schedule, musicianId, vc, startY) {
-  const totalW = W - 2 * MX;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.setTextColor(...GOLD);
+// ─── DRAW: SUNDAY DETAIL TABLE ───────────────────────────────────────────────
+function drawDetailTable(doc, sundays, schedule, musicianId, startY) {
   let y = startY;
-  doc.text("DETALHAMENTO POR DOMINGO", MX, y);
-  y += 3;
-
-  const rowH = 7.5;
-  const headerH = 6;
-  const cardH = headerH + sundays.length * rowH + 4;
-  rr(doc, MX - 2, y - 1, totalW + 4, cardH + 2, 3, CARD_BG, CARD_BD, 0.15);
-
-  // Table header
-  y += headerH - 1;
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GOLD_DIM);
-  doc.text("DOMINGO", MX + 4, y);
-  doc.text("DATA", MX + 24, y);
-  doc.text("POSIÇÃO", MX + 48, y);
-  doc.text("STATUS", MX + totalW - 16, y);
+  doc.setFontSize(8);
+  doc.setTextColor(...NAVY);
+  doc.text("DETALHAMENTO POR DOMINGO", ML, y);
+  y += 4;
 
-  doc.setDrawColor(...blend(GOLD, 0.1));
-  doc.setLineWidth(0.08);
-  y += 1.5;
-  doc.line(MX, y, MX + totalW, y);
+  const colW = [14, 28, 80, 30]; // # | Data | Posição | Status
+  const rowH = 6;
+
+  // Header row
+  doc.setFillColor(...NAVY);
+  doc.rect(ML, y, CW, 5.5, "F");
+  const headers = ["#", "Data", "Posição", "Status"];
+  let hx = ML;
+  headers.forEach((h, i) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(...WHITE);
+    doc.text(h, hx + (i === 0 ? 5 : 3), y + 3.8);
+    hx += colW[i];
+  });
+  y += 5.5;
 
   sundays.forEach((sun, si) => {
-    y += rowH;
+    // Alternate row background
+    if (si % 2 === 0) {
+      doc.setFillColor(...GRAY_50);
+      doc.rect(ML, y, CW, rowH, "F");
+    }
+
+    // Row border bottom
+    doc.setDrawColor(...GRAY_200);
+    doc.setLineWidth(0.1);
+    doc.line(ML, y + rowH, ML + CW, y + rowH);
+
     // Find positions
     const posList = [];
     let isLead = false;
@@ -421,174 +407,151 @@ function drawSundayDetails(doc, sundays, schedule, musicianId, vc, startY) {
     });
     const isOff = posList.length === 0;
 
-    // Sunday number
+    let tx = ML;
+
+    // # column
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(...(isOff ? TXT_DMR : vc.tag));
-    doc.text(String(si + 1), MX + 8, y, { align: "center" });
+    doc.setFontSize(7.5);
+    doc.setTextColor(...(isOff ? GRAY_400 : NAVY));
+    doc.text(String(si + 1), tx + 5, y + 4.2);
+    tx += colW[0];
 
     // Date
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...(isOff ? TXT_DMR : TXT));
-    doc.text(`${String(sun.getDate()).padStart(2,"0")}/${String(sun.getMonth()+1).padStart(2,"0")}/${sun.getFullYear()}`, MX + 24, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...(isOff ? GRAY_400 : GRAY_700));
+    doc.text(`${String(sun.getDate()).padStart(2,"0")}/${String(sun.getMonth()+1).padStart(2,"0")}/${sun.getFullYear()}`, tx + 3, y + 4.2);
+    tx += colW[1];
 
     // Position
     if (posList.length > 0) {
       doc.setFont("helvetica", isLead ? "bold" : "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...(isLead ? vc.tag : TXT));
-      doc.text(posList.join(", "), MX + 48, y);
+      doc.setFontSize(7.5);
+      doc.setTextColor(...(isLead ? GOLD_DARK : GRAY_700));
+      doc.text(posList.join(", "), tx + 3, y + 4.2);
     } else {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...TXT_DMR);
-      doc.text("—", MX + 48, y);
+      doc.setFontSize(7.5);
+      doc.setTextColor(...GRAY_400);
+      doc.text("—", tx + 3, y + 4.2);
     }
+    tx += colW[2];
 
     // Status badge
-    let badgeText, badgeColor, badgeBg;
-    if (isLead) { badgeText = "LEAD"; badgeColor = GOLD; badgeBg = [46,37,16]; }
-    else if (posList.length > 0) { badgeText = "ATIVO"; badgeColor = GREEN; badgeBg = GREEN_BG; }
-    else { badgeText = "FOLGA"; badgeColor = TXT_DIM; badgeBg = blend([255,255,255], 0.03); }
+    let badgeText, badgeBg, badgeTextColor;
+    if (isLead) { badgeText = "LEAD"; badgeBg = AMBER_BG; badgeTextColor = AMBER_D; }
+    else if (posList.length > 0) { badgeText = "Ativo"; badgeBg = GREEN_BG; badgeTextColor = GREEN_D; }
+    else { badgeText = "Folga"; badgeBg = GRAY_100; badgeTextColor = GRAY_500; }
 
-    const bx = MX + totalW - 22;
-    rr(doc, bx, y - 3, 18, 4.5, 1.5, badgeBg, blend(badgeColor, 0.3), 0.08);
+    doc.setFillColor(...badgeBg);
+    doc.roundedRect(tx + 2, y + 1, 20, 4.2, 1, 1, "F");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(5);
-    doc.setTextColor(...badgeColor);
-    doc.text(badgeText, bx + 9, y - 0.5, { align: "center" });
+    doc.setFontSize(5.5);
+    doc.setTextColor(...badgeTextColor);
+    doc.text(badgeText, tx + 12, y + 4, { align: "center" });
 
-    // Row separator
-    if (si < sundays.length - 1) {
-      doc.setDrawColor(...blend([255,255,255], 0.03));
-      doc.setLineWidth(0.05);
-      doc.line(MX + 2, y + 2, MX + totalW - 2, y + 2);
-    }
+    y += rowH;
   });
 
-  return y + 6;
+  // Bottom border
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.3);
+  doc.line(ML, y, ML + CW, y);
+
+  return y + 3;
 }
 
-// ─── DRAW FOOTER ─────────────────────────────────────────────────────────────
+// ─── DRAW: FOOTER ────────────────────────────────────────────────────────────
 function drawFooter(doc, pageNum) {
+  const y = H - 8;
+  doc.setDrawColor(...GRAY_200);
+  doc.setLineWidth(0.2);
+  doc.line(ML, y - 2, W - MR, y - 2);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.5);
-  doc.setTextColor(...TXT_DMR);
-  doc.text(
-    `Gerado pelo sistema Escala de Músicos  •  HLSS Prime Services  •  ${nowStr()}`,
-    W / 2, H - 8, { align: "center" }
-  );
-  doc.text(`Pág ${pageNum}`, W - MX, H - 8, { align: "right" });
+  doc.setFontSize(6);
+  doc.setTextColor(...GRAY_400);
+  doc.text(`Gerado em ${nowStr()}  |  Escala de Músicos  |  HLSS Prime Services`, ML, y);
+  doc.text(`Página ${pageNum}`, W - MR, y, { align: "right" });
+}
+
+// ─── COMPUTE MONTH DATA ─────────────────────────────────────────────────────
+function computeMonthData(mid, sched, sundays, blockDates) {
+  const scheduledSet = new Set();
+  sundays.forEach((_, si) => {
+    Object.keys(POS_META).forEach(pid => {
+      const maxSlots = pid === "vocal_back" ? 3 : 1;
+      for (let s = 0; s < maxSlots; s++) {
+        if (sched[`${si}-${pid}-${s}`] === mid) scheduledSet.add(si);
+      }
+    });
+  });
+
+  const musicianSundays = [...scheduledSet].sort((a,b)=>a-b).map(si => sundays[si]);
+  const blockedKeys = blockDates[mid] || [];
+  const blockedDatesList = sundays.filter(s => blockedKeys.includes(dateKey(s)));
+  const leadSundays = sundays.filter((_, si) => sched[`${si}-vocal_principal-0`] === mid);
+
+  const positionsPlayed = {};
+  sundays.forEach((_, si) => {
+    Object.keys(POS_META).forEach(pid => {
+      const maxSlots = pid === "vocal_back" ? 3 : 1;
+      for (let s = 0; s < maxSlots; s++) {
+        if (sched[`${si}-${pid}-${s}`] === mid) {
+          positionsPlayed[pid] = (positionsPlayed[pid] || 0) + 1;
+        }
+      }
+    });
+  });
+
+  return {
+    musicianSundays,
+    blockedDatesList,
+    leadSundays,
+    positionsPlayed,
+    stats: {
+      scheduled: musicianSundays.length,
+      folgas: sundays.length - musicianSundays.length,
+      leads: leadSundays.length,
+      blocked: blockedDatesList.length,
+    },
+  };
+}
+
+// ─── RENDER ONE MONTH PAGE ──────────────────────────────────────────────────
+function renderMonthPage(doc, musician, yr, mo, sched, blockDates, pageNum) {
+  const mid = musician.id;
+  const vc = getVC(mid);
+  const sundays = getSundays(yr, mo);
+  const monthLabel = `${MONTHS_PT[mo]} ${yr}`;
+  const data = computeMonthData(mid, sched, sundays, blockDates);
+
+  let y = drawHeader(doc, musician, monthLabel, vc);
+  y = drawStats(doc, data.stats, y);
+  y = drawCalendar(doc, yr, mo, sundays, data.musicianSundays, data.blockedDatesList, data.leadSundays, vc, y);
+
+  // Two-column: Positions left, Detail table right (both below calendar)
+  // Actually, for clean Word-style: positions first, then table
+  y = drawPositions(doc, data.positionsPlayed, musician.roles || [], y);
+  y = drawDetailTable(doc, sundays, sched, mid, y);
+
+  drawFooter(doc, pageNum);
 }
 
 // ─── GENERATE SINGLE MUSICIAN REPORT ────────────────────────────────────────
 export function generateMusicianPDF(musician, allSchedules, blockDates) {
-  const mid = musician.id;
-  const vc = getVC(mid);
-  const monthKeys = Object.keys(allSchedules).filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
+  const monthKeys = Object.keys(allSchedules)
+    .filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
 
   if (monthKeys.length === 0) return null;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   doc.setProperties({ title: `Relatório - ${musician.name}`, author: "Escala de Músicos — HLSS Prime Services" });
 
-  let pageNum = 0;
-
-  monthKeys.forEach((mk, mkIdx) => {
+  monthKeys.forEach((mk, idx) => {
     const [yStr, mStr] = mk.split("-");
-    const yr = parseInt(yStr), mo = parseInt(mStr);
-    const sched = allSchedules[mk];
-    const sundays = getSundays(yr, mo);
-    const monthLabel = `${MONTHS_PT[mo]} ${yr}  •  ${sundays.length} domingos`;
-
-    // Determine musician's participation
-    const scheduledSet = new Set();
-    sundays.forEach((_, si) => {
-      Object.keys(POS_META).forEach(pid => {
-        const maxSlots = pid === "vocal_back" ? 3 : 1;
-        for (let s = 0; s < maxSlots; s++) {
-          if (sched[`${si}-${pid}-${s}`] === mid) scheduledSet.add(si);
-        }
-      });
-    });
-
-    const musicianSundays = [...scheduledSet].sort((a,b) => a-b).map(si => sundays[si]);
-    const blockedKeys = blockDates[mid] || [];
-    const blockedDatesList = sundays.filter(s => blockedKeys.includes(dateKey(s)));
-    const leadSundays = sundays.filter((_, si) => sched[`${si}-vocal_principal-0`] === mid);
-
-    const positionsPlayed = {};
-    sundays.forEach((_, si) => {
-      Object.keys(POS_META).forEach(pid => {
-        const maxSlots = pid === "vocal_back" ? 3 : 1;
-        for (let s = 0; s < maxSlots; s++) {
-          if (sched[`${si}-${pid}-${s}`] === mid) {
-            positionsPlayed[pid] = (positionsPlayed[pid] || 0) + 1;
-          }
-        }
-      });
-    });
-
-    const stats = {
-      scheduled: musicianSundays.length,
-      folgas: sundays.length - musicianSundays.length,
-      leads: leadSundays.length,
-      blocked: blockedDatesList.length,
-    };
-
-    // New page (except first)
-    if (mkIdx > 0) doc.addPage();
-    pageNum++;
-
-    // Page 1: Calendar + Stats
-    drawBackground(doc);
-    let y = drawHeader(doc, musician, monthLabel, vc);
-    y = drawLegend(doc, vc, y);
-    y = drawCalendar(doc, yr, mo, sundays, musicianSundays, blockedDatesList, leadSundays, vc, y);
-    y = drawStatsCards(doc, stats, vc, y);
-
-    // Check space for positions + table
-    const rolesInPos = Object.keys(POS_META).filter(pid => (musician.roles || []).includes(pid));
-    const posH = rolesInPos.length * 8 + 16;
-    const tableH = sundays.length * 7.5 + 20;
-
-    if (y + posH + tableH < H - 15) {
-      // All fits on one page
-      y = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y);
-      y = drawSundayDetails(doc, sundays, sched, mid, vc, y);
-      drawFooter(doc, pageNum);
-    } else {
-      // Positions on page 1, table on page 2
-      if (y + posH < H - 15) {
-        y = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y);
-      }
-      drawFooter(doc, pageNum);
-
-      // Page 2
-      doc.addPage();
-      pageNum++;
-      drawBackground(doc);
-
-      // Mini header
-      let y2 = 20;
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(13);
-      doc.setTextColor(...TXT);
-      doc.text(`✦  ${musician.short}  ✦`, W / 2, y2, { align: "center" });
-      y2 += 7;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...GOLD);
-      doc.text(monthLabel, W / 2, y2, { align: "center" });
-      y2 += 8;
-
-      if (y + posH >= H - 15) {
-        y2 = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y2);
-      }
-      y2 = drawSundayDetails(doc, sundays, sched, mid, vc, y2);
-      drawFooter(doc, pageNum);
-    }
+    if (idx > 0) doc.addPage();
+    renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, idx + 1);
   });
 
   return doc;
@@ -597,7 +560,8 @@ export function generateMusicianPDF(musician, allSchedules, blockDates) {
 // ─── GENERATE ALL MUSICIANS PDF (Combined) ──────────────────────────────────
 export function generateAllMusiciansPDF(musicians, allSchedules, blockDates) {
   const active = musicians.filter(m => !m.manualOnly);
-  const monthKeys = Object.keys(allSchedules).filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
+  const monthKeys = Object.keys(allSchedules)
+    .filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
 
   if (monthKeys.length === 0 || active.length === 0) return null;
 
@@ -608,96 +572,12 @@ export function generateAllMusiciansPDF(musicians, allSchedules, blockDates) {
   let isFirst = true;
 
   active.forEach(musician => {
-    const mid = musician.id;
-    const vc = getVC(mid);
-
     monthKeys.forEach(mk => {
       const [yStr, mStr] = mk.split("-");
-      const yr = parseInt(yStr), mo = parseInt(mStr);
-      const sched = allSchedules[mk];
-      const sundays = getSundays(yr, mo);
-      const monthLabel = `${MONTHS_PT[mo]} ${yr}  •  ${sundays.length} domingos`;
-
-      const scheduledSet = new Set();
-      sundays.forEach((_, si) => {
-        Object.keys(POS_META).forEach(pid => {
-          const maxSlots = pid === "vocal_back" ? 3 : 1;
-          for (let s = 0; s < maxSlots; s++) {
-            if (sched[`${si}-${pid}-${s}`] === mid) scheduledSet.add(si);
-          }
-        });
-      });
-
-      const musicianSundays = [...scheduledSet].sort((a,b) => a-b).map(si => sundays[si]);
-      const blockedKeys = blockDates[mid] || [];
-      const blockedDatesList = sundays.filter(s => blockedKeys.includes(dateKey(s)));
-      const leadSundays = sundays.filter((_, si) => sched[`${si}-vocal_principal-0`] === mid);
-
-      const positionsPlayed = {};
-      sundays.forEach((_, si) => {
-        Object.keys(POS_META).forEach(pid => {
-          const maxSlots = pid === "vocal_back" ? 3 : 1;
-          for (let s = 0; s < maxSlots; s++) {
-            if (sched[`${si}-${pid}-${s}`] === mid) {
-              positionsPlayed[pid] = (positionsPlayed[pid] || 0) + 1;
-            }
-          }
-        });
-      });
-
-      const stats = {
-        scheduled: musicianSundays.length,
-        folgas: sundays.length - musicianSundays.length,
-        leads: leadSundays.length,
-        blocked: blockedDatesList.length,
-      };
-
       if (!isFirst) doc.addPage();
       isFirst = false;
       pageNum++;
-
-      drawBackground(doc);
-      let y = drawHeader(doc, musician, monthLabel, vc);
-      y = drawLegend(doc, vc, y);
-      y = drawCalendar(doc, yr, mo, sundays, musicianSundays, blockedDatesList, leadSundays, vc, y);
-      y = drawStatsCards(doc, stats, vc, y);
-
-      const rolesInPos = Object.keys(POS_META).filter(pid => (musician.roles || []).includes(pid));
-      const posH = rolesInPos.length * 8 + 16;
-      const tableH = sundays.length * 7.5 + 20;
-
-      if (y + posH + tableH < H - 15) {
-        y = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y);
-        y = drawSundayDetails(doc, sundays, sched, mid, vc, y);
-        drawFooter(doc, pageNum);
-      } else {
-        if (y + posH < H - 15) {
-          y = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y);
-        }
-        drawFooter(doc, pageNum);
-
-        doc.addPage();
-        pageNum++;
-        drawBackground(doc);
-
-        let y2 = 20;
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(13);
-        doc.setTextColor(...TXT);
-        doc.text(`✦  ${musician.short}  ✦`, W / 2, y2, { align: "center" });
-        y2 += 7;
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...GOLD);
-        doc.text(monthLabel, W / 2, y2, { align: "center" });
-        y2 += 8;
-
-        if (y + posH >= H - 15) {
-          y2 = drawPositions(doc, positionsPlayed, musician.roles || [], vc, y2);
-        }
-        y2 = drawSundayDetails(doc, sundays, sched, mid, vc, y2);
-        drawFooter(doc, pageNum);
-      }
+      renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, pageNum);
     });
   });
 
