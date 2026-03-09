@@ -114,14 +114,18 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
   const schedule = {};
   const getM = (id) => musicians.find(m => m.id === id);
 
+  // Filter out manualOnly musicians — they are NEVER auto-assigned
+  const autoMusicians = musicians.filter(m => !m.manualOnly);
+  const autoLeadVocalists = leadVocalists.filter(id => !getM(id)?.manualOnly);
+
   // ═══ PHASE 1: Plan availability per Sunday ═══
-  const avail = Array.from({ length: total }, () => new Set(musicians.map(m => m.id)));
+  const avail = Array.from({ length: total }, () => new Set(autoMusicians.map(m => m.id)));
 
   // 1a. BLOCK DATES — remove musicians on their blocked Sundays
   if (blockDates && typeof blockDates === "object") {
     for (let si = 0; si < total; si++) {
       const dk = dateKey(sundays[si]);
-      musicians.forEach(m => {
+      autoMusicians.forEach(m => {
         const blocked = blockDates[m.id];
         if (Array.isArray(blocked) && blocked.includes(dk)) {
           avail[si].delete(m.id);
@@ -131,12 +135,12 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
   }
 
   // 1b. Alternating musicians (e.g., Madalena): off every other Sunday
-  musicians.filter(m => m.alternating).forEach(m => {
+  autoMusicians.filter(m => m.alternating).forEach(m => {
     for (let si = 1; si < total; si += 2) avail[si].delete(m.id);
   });
 
   // 1c. maxPerMonth musicians (e.g., Ana: plays only 1 Sunday)
-  musicians.filter(m => m.maxPerMonth).forEach(m => {
+  autoMusicians.filter(m => m.maxPerMonth).forEach(m => {
     const plays = new Set();
     for (let i = 0; i < Math.min(m.maxPerMonth, total); i++) {
       plays.add(Math.round(i * total / m.maxPerMonth));
@@ -149,7 +153,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
   // 1d. Build couple/individual groups that need folga
   const groups = [];
   const seen = new Set();
-  musicians.forEach(m => {
+  autoMusicians.forEach(m => {
     if (seen.has(m.id) || m.noFolgaRequired || m.alternating || m.maxPerMonth) {
       seen.add(m.id);
       return;
@@ -183,7 +187,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
     let bestSi = gi % total;
     let bestScore = Infinity;
     for (let si = 0; si < total; si++) {
-      const offCount = musicians.length - avail[si].size;
+      const offCount = autoMusicians.length - avail[si].size;
       // If prev month stats available, prefer giving folga to groups that played more
       let prevBonus = 0;
       if (prevMonthStats) {
@@ -201,7 +205,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
 
   // 1e. ENFORCE couple constraint: if one partner is off, the other MUST be off too
   for (let si = 0; si < total; si++) {
-    musicians.forEach(m => {
+    autoMusicians.forEach(m => {
       if (!m.coupleId) return;
       const iIn = avail[si].has(m.id);
       const partnerIn = avail[si].has(m.coupleId);
@@ -211,13 +215,13 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
   }
 
   // ═══ PHASE 2: Assign positions ═══
-  // Build robust lead rotation queue
+  // Build robust lead rotation queue (only auto musicians)
   let leadQ = Array.isArray(inputLeadRotation) && inputLeadRotation.length > 0
-    ? [...inputLeadRotation] : [...leadVocalists];
-  // Keep only valid vocalist IDs
-  leadQ = leadQ.filter(id => leadVocalists.includes(id));
-  // Make sure all vocalists are in the queue
-  leadVocalists.forEach(id => { if (!leadQ.includes(id)) leadQ.push(id); });
+    ? [...inputLeadRotation] : [...autoLeadVocalists];
+  // Keep only valid auto vocalist IDs
+  leadQ = leadQ.filter(id => autoLeadVocalists.includes(id));
+  // Make sure all auto vocalists are in the queue
+  autoLeadVocalists.forEach(id => { if (!leadQ.includes(id)) leadQ.push(id); });
 
   // If we have previous month stats, ensure the last lead doesn't lead first this month
   if (prevMonthStats?.lastLead && leadQ[0] === prevMonthStats.lastLead) {
@@ -230,7 +234,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
 
   // Initialize sundayCount with previous month awareness
   const sundayCount = {};
-  musicians.forEach(m => {
+  autoMusicians.forEach(m => {
     // Start with a small bias from previous month to balance across months
     sundayCount[m.id] = prevMonthStats ? Math.round((prevMonthStats.counts[m.id] || 0) * 0.3) : 0;
   });
@@ -247,9 +251,9 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
         break;
       }
     }
-    // If queue exhausted, refill with all lead vocalists and try again
+    // If queue exhausted, refill with all auto lead vocalists and try again
     if (!lead) {
-      leadQ = [...leadVocalists];
+      leadQ = [...autoLeadVocalists];
       for (let i = 0; i < leadQ.length; i++) {
         if (pool.has(leadQ[i])) {
           lead = leadQ.splice(i, 1)[0];
@@ -277,7 +281,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
 
     // ── 2. Teclado (REQUIRED — assign before violão so Hugo can cover) ──
     {
-      const cands = musicians
+      const cands = autoMusicians
         .filter(m => pool.has(m.id) && m.roles.includes("teclado") && !used.has(m.id))
         .sort((a, b) => sundayCount[a.id] - sundayCount[b.id]);
       if (cands.length > 0) {
@@ -295,7 +299,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
 
     // ── 3. Bateria (REQUIRED) ──
     {
-      const cands = musicians
+      const cands = autoMusicians
         .filter(m => pool.has(m.id) && m.roles.includes("bateria") && !used.has(m.id))
         .sort((a, b) => sundayCount[a.id] - sundayCount[b.id]);
       if (cands.length > 0) {
@@ -313,7 +317,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
       }
     }
     if (!schedule[`${si}-violao-0`]) {
-      const cands = musicians
+      const cands = autoMusicians
         .filter(m => pool.has(m.id) && m.roles.includes("violao") && !used.has(m.id))
         .sort((a, b) => sundayCount[a.id] - sundayCount[b.id]);
       if (cands.length > 0) {
@@ -325,7 +329,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
 
     // ── 5. Back Vocals (target: 2 minimum, 3rd is bonus) ──
     let bSlot = [0, 1, 2].filter(s => schedule[`${si}-vocal_back-${s}`]).length;
-    const backPool = musicians
+    const backPool = autoMusicians
       .filter(m => pool.has(m.id) && m.roles.includes("vocal_back") && !used.has(m.id))
       .sort((a, b) => sundayCount[a.id] - sundayCount[b.id]);
 
@@ -340,7 +344,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
     // ── 6. Remaining instruments (baixo, guitarra) ──
     for (const posId of ["baixo", "guitarra"]) {
       if (schedule[`${si}-${posId}-0`]) continue;
-      const cands = musicians
+      const cands = autoMusicians
         .filter(m => pool.has(m.id) && m.roles.includes(posId) && !used.has(m.id))
         .sort((a, b) => sundayCount[a.id] - sundayCount[b.id]);
       if (cands.length > 0) {
@@ -352,7 +356,7 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
   }
 
   // Return remaining queue (if empty, refill)
-  if (leadQ.length === 0) leadQ = [...leadVocalists];
+  if (leadQ.length === 0) leadQ = [...autoLeadVocalists];
   return { schedule, newLeadQueue: leadQ };
 }
 
@@ -473,7 +477,13 @@ export default function EscalaMusicos() {
   const [musicians, setMusicians] = useState(DEFAULT_MUSICIANS);
   const [editingMusician, setEditingMusician] = useState(null);
   const [blockDates, setBlockDates] = useState({});
-  const saveTimer = useRef(null);
+  const [showExport, setShowExport] = useState(false);
+  const [exportRange, setExportRange] = useState("current"); // "current" | "custom"
+  const [exportFromMonth, setExportFromMonth] = useState(today.getMonth());
+  const [exportFromYear, setExportFromYear] = useState(today.getFullYear());
+  const [exportToMonth, setExportToMonth] = useState(today.getMonth());
+  const [exportToYear, setExportToYear] = useState(today.getFullYear());
+  const saveTimers = useRef({});
   const monthKey = `${year}-${month}`;
   const sundays = getSundays(year, month);
   const leadVocalists = musicians.filter(m => m.roles.includes("vocal_principal")).map(m => m.id);
@@ -505,13 +515,14 @@ export default function EscalaMusicos() {
     loadData();
   }, []);
 
-  // ── Debounced save to API ──
+  // ── Debounced save to API (per-key timers to avoid cancellation) ──
   function debouncedSave(key, value) {
     setSaving(true);
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
+    if (saveTimers.current[key]) clearTimeout(saveTimers.current[key]);
+    saveTimers.current[key] = setTimeout(async () => {
       await apiPut(key, value);
-      setSaving(false);
+      delete saveTimers.current[key];
+      if (Object.keys(saveTimers.current).length === 0) setSaving(false);
     }, 500);
   }
   function persist(schedules, rotation) {
@@ -601,6 +612,143 @@ export default function EscalaMusicos() {
       const blocked = blockDates[m.id];
       return Array.isArray(blocked) && blocked.includes(dk);
     });
+  }
+
+  // ── Export helpers ──
+  function buildExportHTML(monthsToExport) {
+    let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Escala de Músicos</title>
+<style>
+  body { font-family: Georgia, serif; background: #fff; color: #222; padding: 20px; max-width: 900px; margin: 0 auto; }
+  h1 { text-align: center; color: #333; font-size: 24px; margin-bottom: 4px; }
+  .subtitle { text-align: center; color: #888; font-size: 12px; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 24px; }
+  h2 { color: #8a6d3b; font-size: 18px; border-bottom: 2px solid #d4a84e; padding-bottom: 6px; margin-top: 30px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 12px; }
+  th { background: #f5f0e5; color: #8a6d3b; padding: 10px 6px; text-align: center; border: 1px solid #ddd; font-weight: 700; }
+  td { padding: 8px 6px; text-align: center; border: 1px solid #ddd; }
+  .pos-label { text-align: left; font-weight: 600; color: #555; background: #fafafa; }
+  .lead { font-weight: 700; color: #d4a84e; }
+  .folga { color: #aaa; font-style: italic; font-size: 11px; }
+  .blocked { color: #cc4444; font-size: 10px; }
+  .footer { text-align: center; color: #bbb; font-size: 10px; margin-top: 30px; letter-spacing: 1px; }
+  .stats { margin: 10px 0 20px; }
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .stat-card { border: 1px solid #eee; border-radius: 8px; padding: 8px 10px; font-size: 11px; }
+  .stat-name { font-weight: 700; font-size: 12px; }
+  @media print { body { padding: 0; } h2 { page-break-before: auto; } table { page-break-inside: avoid; } }
+</style></head><body>
+<h1>\u2726 Escala de Músicos \u2726</h1>
+<div class="subtitle">Ministério de Louvor</div>`;
+
+    for (const { y, m } of monthsToExport) {
+      const mk = `${y}-${m}`;
+      const sched = allSchedules[mk];
+      if (!sched || Object.keys(sched).length === 0) continue;
+      const suns = getSundays(y, m);
+
+      html += `<h2>${MONTHS[m]} ${y} (${suns.length} domingos)</h2>`;
+      html += `<table><thead><tr><th>Posição</th>`;
+      suns.forEach((s, i) => {
+        html += `<th>Dom ${i+1}<br>${fmt(s)}</th>`;
+      });
+      html += `</tr></thead><tbody>`;
+
+      POSITIONS.forEach(pos => {
+        for (let slot = 0; slot < pos.count; slot++) {
+          const label = pos.count > 1 ? `${pos.icon} ${pos.label} #${slot+1}` : `${pos.icon} ${pos.label}`;
+          html += `<tr><td class="pos-label">${label}</td>`;
+          suns.forEach((_, si) => {
+            const mid = sched[`${si}-${pos.id}-${slot}`];
+            const mus = mid ? getMusicianById(mid) : null;
+            const isLead = pos.id === "vocal_principal";
+            html += `<td class="${isLead && mus ? 'lead' : ''}">${mus ? mus.short : '\u2014'}</td>`;
+          });
+          html += `</tr>`;
+        }
+      });
+
+      // Folga row
+      html += `<tr><td class="pos-label">\u{1F4A4} Folga</td>`;
+      suns.forEach((_, si) => {
+        const off = musicians.filter(mus => {
+          const present = new Set();
+          Object.entries(sched).forEach(([k, v]) => { if (v === mus.id) present.add(parseInt(k.split("-")[0])); });
+          return !present.has(si);
+        });
+        html += `<td class="folga">${off.map(o => o.short).join(", ") || "\u2014"}</td>`;
+      });
+      html += `</tr></tbody></table>`;
+
+      // Stats
+      html += `<div class="stats"><div class="stats-grid">`;
+      musicians.forEach(mus => {
+        const present = new Set();
+        Object.entries(sched).forEach(([k, v]) => { if (v === mus.id) present.add(parseInt(k.split("-")[0])); });
+        const count = present.size;
+        const leads = suns.filter((_, si) => sched[`${si}-vocal_principal-0`] === mus.id).length;
+        html += `<div class="stat-card"><div class="stat-name">${mus.short}</div>${count}x escalado \u2022 ${suns.length - count}x folga${leads > 0 ? ` \u2022 ${leads}x lead` : ''}</div>`;
+      });
+      html += `</div></div>`;
+    }
+
+    html += `<div class="footer">Gerado pelo sistema Escala de Músicos \u2022 HLSS Prime Services \u2022 ${new Date().toLocaleDateString("pt-BR")}</div>`;
+    html += `</body></html>`;
+    return html;
+  }
+
+  function exportSchedule() {
+    let monthsToExport = [];
+    if (exportRange === "current") {
+      monthsToExport = [{ y: year, m: month }];
+    } else {
+      let cy = exportFromYear, cm = exportFromMonth;
+      const endKey = `${exportToYear}-${exportToMonth}`;
+      while (true) {
+        monthsToExport.push({ y: cy, m: cm });
+        if (`${cy}-${cm}` === endKey) break;
+        cm++;
+        if (cm > 11) { cm = 0; cy++; }
+        if (monthsToExport.length > 24) break; // safety limit
+      }
+    }
+
+    const html = buildExportHTML(monthsToExport);
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const title = monthsToExport.length === 1
+      ? `Escala_${MONTHS[monthsToExport[0].m]}_${monthsToExport[0].y}`
+      : `Escala_${MONTHS[monthsToExport[0].m]}${monthsToExport[0].y}_a_${MONTHS[monthsToExport[monthsToExport.length-1].m]}${monthsToExport[monthsToExport.length-1].y}`;
+    a.href = url;
+    a.download = `${title}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowExport(false);
+  }
+
+  function printSchedule() {
+    let monthsToExport = [];
+    if (exportRange === "current") {
+      monthsToExport = [{ y: year, m: month }];
+    } else {
+      let cy = exportFromYear, cm = exportFromMonth;
+      const endKey = `${exportToYear}-${exportToMonth}`;
+      while (true) {
+        monthsToExport.push({ y: cy, m: cm });
+        if (`${cy}-${cm}` === endKey) break;
+        cm++;
+        if (cm > 11) { cm = 0; cy++; }
+        if (monthsToExport.length > 24) break;
+      }
+    }
+
+    const html = buildExportHTML(monthsToExport);
+    const win = window.open("", "_blank");
+    win.document.write(html);
+    win.document.close();
+    setTimeout(() => win.print(), 300);
+    setShowExport(false);
   }
 
   // ── Get previous month info for scheduling ──
@@ -736,7 +884,87 @@ export default function EscalaMusicos() {
               {"\u{1F5D1}"} Limpar Mês
             </button>
           )}
+          <button onClick={() => { setExportFromMonth(month); setExportFromYear(year); setExportToMonth(month); setExportToYear(year); setShowExport(true); }} style={{
+            ...actionBtnStyle, background:"rgba(105,180,255,0.15)", border:"1px solid rgba(105,180,255,0.3)", color:"#69b4ff"
+          }}>
+            {"\u{1F4E4}"} Exportar
+          </button>
         </div>
+        {/* ── EXPORT MODAL ── */}
+        {showExport && (
+          <div style={{ position:"fixed", inset:0, zIndex:999, display:"flex", alignItems:"center", justifyContent:"center", background:"rgba(0,0,0,0.7)" }} onClick={() => setShowExport(false)}>
+            <div onClick={e => e.stopPropagation()} style={{ background:"#1a1635", border:"1px solid rgba(201,169,110,0.3)", borderRadius:"16px", padding:"28px", maxWidth:"420px", width:"90%", boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}>
+              <div style={{ fontSize:"18px", fontWeight:"700", color:"#f0e6d3", marginBottom:"4px" }}>{"\u{1F4E4}"} Exportar Escala</div>
+              <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", marginBottom:"20px" }}>Gere um arquivo HTML para imprimir ou salvar</div>
+
+              <div style={{ marginBottom:"16px" }}>
+                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"8px" }}>Período</div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <button onClick={() => setExportRange("current")} style={{
+                    flex:1, padding:"10px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia, serif",
+                    background: exportRange==="current" ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
+                    border: exportRange==="current" ? "1px solid rgba(201,169,110,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                    color: exportRange==="current" ? "#c9a96e" : "rgba(255,255,255,0.5)"
+                  }}>Mês Atual</button>
+                  <button onClick={() => setExportRange("custom")} style={{
+                    flex:1, padding:"10px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia, serif",
+                    background: exportRange==="custom" ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.04)",
+                    border: exportRange==="custom" ? "1px solid rgba(201,169,110,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                    color: exportRange==="custom" ? "#c9a96e" : "rgba(255,255,255,0.5)"
+                  }}>Vários Meses</button>
+                </div>
+              </div>
+
+              {exportRange === "current" && (
+                <div style={{ padding:"12px", borderRadius:"10px", background:"rgba(255,255,255,0.03)", border:"1px solid rgba(255,255,255,0.08)", marginBottom:"16px", textAlign:"center", fontSize:"14px", color:"#f0e6d3" }}>
+                  {MONTHS[month]} {year}
+                  {!hasData && <div style={{ fontSize:"11px", color:"#ff8c69", marginTop:"4px" }}>Sem escala gerada neste mês</div>}
+                </div>
+              )}
+
+              {exportRange === "custom" && (
+                <div style={{ marginBottom:"16px" }}>
+                  <div style={{ display:"flex", gap:"12px", alignItems:"center", marginBottom:"8px" }}>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"1px", marginBottom:"4px" }}>DE</div>
+                      <div style={{ display:"flex", gap:"4px" }}>
+                        <select value={exportFromMonth} onChange={e => setExportFromMonth(parseInt(e.target.value))} style={selectStyle}>
+                          {MONTHS.map((m,i) => <option key={i} value={i}>{m}</option>)}
+                        </select>
+                        <input type="number" value={exportFromYear} onChange={e => setExportFromYear(parseInt(e.target.value))} style={{...selectStyle, width:"70px"}} />
+                      </div>
+                    </div>
+                    <div style={{ color:"#c9a96e", fontSize:"16px", marginTop:"16px" }}>{"\u2192"}</div>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"1px", marginBottom:"4px" }}>ATÉ</div>
+                      <div style={{ display:"flex", gap:"4px" }}>
+                        <select value={exportToMonth} onChange={e => setExportToMonth(parseInt(e.target.value))} style={selectStyle}>
+                          {MONTHS.map((m,i) => <option key={i} value={i}>{m}</option>)}
+                        </select>
+                        <input type="number" value={exportToYear} onChange={e => setExportToYear(parseInt(e.target.value))} style={{...selectStyle, width:"70px"}} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div style={{ display:"flex", gap:"10px" }}>
+                <button onClick={exportSchedule} style={{
+                  flex:1, padding:"12px", borderRadius:"10px", border:"none", cursor:"pointer", fontSize:"13px", fontWeight:"700",
+                  fontFamily:"Georgia, serif", background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e"
+                }}>{"\u{1F4E5}"} Baixar HTML</button>
+                <button onClick={printSchedule} style={{
+                  flex:1, padding:"12px", borderRadius:"10px", border:"1px solid rgba(201,169,110,0.3)", cursor:"pointer", fontSize:"13px", fontWeight:"600",
+                  fontFamily:"Georgia, serif", background:"rgba(201,169,110,0.1)", color:"#c9a96e"
+                }}>{"\u{1F5A8}"} Imprimir</button>
+              </div>
+              <button onClick={() => setShowExport(false)} style={{
+                width:"100%", marginTop:"10px", padding:"10px", borderRadius:"8px", border:"1px solid rgba(255,255,255,0.1)",
+                background:"transparent", color:"rgba(255,255,255,0.4)", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia, serif"
+              }}>Cancelar</button>
+            </div>
+          </div>
+        )}
         {/* ── PREVIOUS MONTH INFO BANNER ── */}
         {hasPrevMonthSchedule && (
           <div style={{ marginBottom:"12px", padding:"8px 16px", borderRadius:"10px", background:"rgba(105,180,255,0.08)", border:"1px solid rgba(105,180,255,0.2)", fontSize:"11px", color:"#69b4ff", textAlign:"center" }}>
@@ -1039,6 +1267,7 @@ export default function EscalaMusicos() {
                         {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
                         {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
                         {blockedCount > 0 && <span style={{ color:"#ff8c69" }}> {"\u2022"} {blockedCount} bloqueio{blockedCount>1?"s":""}</span>}
+                        {m.manualOnly && <span style={{ color:"#ff8c69" }}> {"\u2022"} manual</span>}
                       </div>
                       <div style={{ display:"flex", gap:"4px", marginBottom:"8px" }}>
                         {sundays.map((_,i) => {
@@ -1192,6 +1421,11 @@ export default function EscalaMusicos() {
                                 {"\u{1F6AB}"} {blockedCount} data{blockedCount>1?"s":""} bloqueada{blockedCount>1?"s":""}
                               </span>
                             )}
+                            {m.manualOnly && (
+                              <span style={{ fontSize:"10px", color:"#ff8c69", marginLeft:"8px", background:"rgba(255,140,105,0.12)", padding:"2px 8px", borderRadius:"10px", border:"1px solid rgba(255,140,105,0.25)" }}>
+                                {"\u{270B}"} somente manual
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -1224,6 +1458,25 @@ export default function EscalaMusicos() {
                               </button>
                             );
                           })}
+                        </div>
+                        {/* Manual Only toggle */}
+                        <div style={{ marginTop:"14px" }}>
+                          <div style={{ fontSize:"9px", color:"#c9a96e", letterSpacing:"2px", textTransform:"uppercase", marginBottom:"8px" }}>Opções</div>
+                          <button onClick={() => updateMusician(m.id, { manualOnly: !m.manualOnly })} style={{
+                            padding:"8px 16px", borderRadius:"20px", fontSize:"11px", fontWeight:"600", cursor:"pointer",
+                            fontFamily:"Georgia, serif", transition:"all 0.15s", display:"flex", alignItems:"center", gap:"8px",
+                            background: m.manualOnly ? "rgba(255,140,105,0.2)" : "rgba(80,180,100,0.15)",
+                            border: m.manualOnly ? "1px solid rgba(255,140,105,0.4)" : "1px solid rgba(80,180,100,0.3)",
+                            color: m.manualOnly ? "#ff8c69" : "#80e880"
+                          }}>
+                            <span style={{ width:"18px", height:"18px", borderRadius:"4px", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px",
+                              background: m.manualOnly ? "rgba(255,140,105,0.3)" : "rgba(80,180,100,0.25)",
+                              border: m.manualOnly ? "1px solid rgba(255,140,105,0.5)" : "1px solid rgba(80,180,100,0.4)"
+                            }}>
+                              {m.manualOnly ? "\u{270B}" : "\u{2728}"}
+                            </span>
+                            {m.manualOnly ? "Somente manual — não incluir na geração automática" : "Incluído na geração automática"}
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1295,6 +1548,7 @@ export default function EscalaMusicos() {
                 "Mínimo 2 back vocals por domingo",
                 "Datas bloqueadas: músicos indisponíveis são removidos automaticamente",
                 "Mês anterior: quando existe, a rotação de leads e folgas considera continuidade",
+                "Somente manual: músicos com esta opção só podem ser escalados manualmente pelo usuário",
               ].map((r,i) => (
                 <div key={i} style={{ padding:"8px 0", borderBottom:"1px solid rgba(255,255,255,0.05)", fontSize:"12px", color:"rgba(240,230,211,0.6)", display:"flex", gap:"8px" }}>
                   <span style={{ color:"#c9a96e", fontSize:"14px" }}>{"\u2726"}</span>{r}
@@ -1327,4 +1581,8 @@ const headerCellStyle = {
 const inputStyle = {
   background:"rgba(255,255,255,0.08)", border:"1px solid rgba(201,169,110,0.3)", borderRadius:"8px",
   padding:"8px 12px", color:"#f0e6d3", fontSize:"13px", fontFamily:"Georgia, serif", outline:"none", width:"200px"
+};
+const selectStyle = {
+  background:"rgba(255,255,255,0.08)", border:"1px solid rgba(201,169,110,0.3)", borderRadius:"8px",
+  padding:"8px 10px", color:"#f0e6d3", fontSize:"12px", fontFamily:"Georgia, serif", outline:"none", flex:1
 };
