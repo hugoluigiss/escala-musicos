@@ -111,8 +111,8 @@ function drawHeader(doc, musician, monthLabel, vc) {
   doc.setTextColor(...GRAY_400);
   doc.text("MINISTÉRIO DE LOUVOR  |  ESCALA DE MÚSICOS", ML, y);
 
-  // HLSS Prime right
-  doc.text("HLSS PRIME SERVICES", W - MR, y, { align: "right" });
+  // Church name right
+  doc.text("VERBO DA VIDA ORLANDO", W - MR, y, { align: "right" });
 
   // Thin line below
   y += 2.5;
@@ -471,7 +471,7 @@ function drawFooter(doc, pageNum) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6);
   doc.setTextColor(...GRAY_400);
-  doc.text(`Gerado em ${nowStr()}  |  Escala de Músicos  |  HLSS Prime Services`, ML, y);
+  doc.text(`Gerado em ${nowStr()}  |  Escala de Músicos  |  Verbo da Vida Orlando`, ML, y);
   doc.text(`Página ${pageNum}`, W - MR, y, { align: "right" });
 }
 
@@ -546,7 +546,7 @@ export function generateMusicianPDF(musician, allSchedules, blockDates) {
   if (monthKeys.length === 0) return null;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  doc.setProperties({ title: `Relatório - ${musician.name}`, author: "Escala de Músicos — HLSS Prime Services" });
+  doc.setProperties({ title: `Relatório - ${musician.name}`, author: "Escala de Músicos — Verbo da Vida Orlando" });
 
   monthKeys.forEach((mk, idx) => {
     const [yStr, mStr] = mk.split("-");
@@ -566,7 +566,7 @@ export function generateAllMusiciansPDF(musicians, allSchedules, blockDates) {
   if (monthKeys.length === 0 || active.length === 0) return null;
 
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-  doc.setProperties({ title: "Relatório Completo — Todos os Músicos", author: "Escala de Músicos — HLSS Prime Services" });
+  doc.setProperties({ title: "Relatório Completo — Todos os Músicos", author: "Escala de Músicos — Verbo da Vida Orlando" });
 
   let pageNum = 0;
   let isFirst = true;
