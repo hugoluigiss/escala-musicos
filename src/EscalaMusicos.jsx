@@ -1817,7 +1817,7 @@ export default function EscalaMusicos() {
                       return (
                         <button key={m.id} disabled={!hasSelection} onClick={() => {
                           try {
-                            const doc = generateMusicianPDF(m, filteredSchedules, blockDates || {});
+                            const doc = generateMusicianPDF(m, filteredSchedules, blockDates || {}, musicians);
                             if (doc) doc.save(`Relatorio_${m.short.replace(/\s+/g,"_")}.pdf`);
                           } catch(e) { console.error("PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
                         }} style={{

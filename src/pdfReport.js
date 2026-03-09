@@ -355,110 +355,152 @@ function drawPositions(doc, positionsPlayed, musicianRoles, startY) {
   return y + 2;
 }
 
-// ─── DRAW: SUNDAY DETAIL TABLE ───────────────────────────────────────────────
-function drawDetailTable(doc, sundays, schedule, musicianId, startY) {
+// ─── DRAW: FULL LINEUP PER SUNDAY ───────────────────────────────────────────
+function drawDetailTable(doc, sundays, schedule, musicianId, musicians, startY) {
   let y = startY;
+
+  const getName = (id) => {
+    if (!id) return null;
+    const m = musicians.find(x => x.id === id);
+    return m ? m.short : id;
+  };
+
+  // Build entries only for Sundays where the musician is scheduled
+  const entries = [];
+  sundays.forEach((sun, si) => {
+    let scheduled = false;
+    Object.keys(POS_META).forEach(pid => {
+      const maxSlots = pid === "vocal_back" ? 3 : 1;
+      for (let s = 0; s < maxSlots; s++) {
+        if (schedule[`${si}-${pid}-${s}`] === musicianId) scheduled = true;
+      }
+    });
+    if (!scheduled) return;
+
+    const isLead = schedule[`${si}-vocal_principal-0`] === musicianId;
+
+    // Full lineup for this Sunday
+    const lineup = {};
+    Object.keys(POS_META).forEach(pid => {
+      const maxSlots = pid === "vocal_back" ? 3 : 1;
+      const names = [];
+      for (let s = 0; s < maxSlots; s++) {
+        const aid = schedule[`${si}-${pid}-${s}`];
+        if (aid) names.push(getName(aid) + (aid === musicianId ? " \u2605" : ""));
+      }
+      lineup[pid] = names.length > 0 ? names.join(", ") : "\u2014";
+    });
+
+    entries.push({ sun, isLead, lineup });
+  });
+
+  if (entries.length === 0) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    doc.setTextColor(...GRAY_400);
+    doc.text("Nenhuma escala\u00e7\u00e3o neste m\u00eas.", ML, y + 4);
+    return y + 10;
+  }
+
+  // Section title
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.setTextColor(...NAVY);
-  doc.text("DETALHAMENTO POR DOMINGO", ML, y);
-  y += 4;
+  doc.text("ESCALA\u00c7\u00c3O COMPLETA POR DOMINGO", ML, y);
 
-  const colW = [14, 28, 80, 30]; // # | Data | Posição | Status
-  const rowH = 6;
+  // Legend
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(6);
+  doc.setTextColor(...GRAY_500);
+  doc.text("\u2605 = voc\u00ea", ML + CW - 12, y, { align: "right" });
+  y += 5;
 
-  // Header row
-  doc.setFillColor(...NAVY);
-  doc.rect(ML, y, CW, 5.5, "F");
-  const headers = ["#", "Data", "Posição", "Status"];
-  let hx = ML;
-  headers.forEach((h, i) => {
+  const posKeys = Object.keys(POS_META);
+  const cols = 4;
+  const colW = CW / cols;
+  const rowH = 7;
+
+  entries.forEach((entry) => {
+    const { sun, isLead, lineup } = entry;
+    const dateStr = `${String(sun.getDate()).padStart(2, "0")}/${String(sun.getMonth() + 1).padStart(2, "0")}/${sun.getFullYear()}`;
+
+    // Date header bar
+    doc.setFillColor(...NAVY);
+    doc.roundedRect(ML, y, CW, 5.5, 1, 1, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.5);
     doc.setTextColor(...WHITE);
-    doc.text(h, hx + (i === 0 ? 5 : 3), y + 3.8);
-    hx += colW[i];
-  });
-  y += 5.5;
+    doc.text(`DOMINGO  ${dateStr}`, ML + 3, y + 3.8);
 
-  sundays.forEach((sun, si) => {
-    // Alternate row background
-    if (si % 2 === 0) {
-      doc.setFillColor(...GRAY_50);
-      doc.rect(ML, y, CW, rowH, "F");
+    if (isLead) {
+      doc.setFillColor(...GOLD);
+      doc.roundedRect(ML + CW - 22, y + 1, 18, 3.5, 1, 1, "F");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(5.5);
+      doc.setTextColor(...NAVY);
+      doc.text("LEAD", ML + CW - 13, y + 3.5, { align: "center" });
     }
 
-    // Row border bottom
-    doc.setDrawColor(...GRAY_200);
-    doc.setLineWidth(0.1);
-    doc.line(ML, y + rowH, ML + CW, y + rowH);
+    y += 6;
 
-    // Find positions
-    const posList = [];
-    let isLead = false;
-    Object.keys(POS_META).forEach(pid => {
-      const maxSlots = pid === "vocal_back" ? 3 : 1;
-      for (let slot = 0; slot < maxSlots; slot++) {
-        if (schedule[`${si}-${pid}-${slot}`] === musicianId) {
-          posList.push(POS_META[pid].label);
-          if (pid === "vocal_principal") isLead = true;
+    // Position grid — 4 columns, ceil(7/4)=2 rows
+    const rowCount = Math.ceil(posKeys.length / cols);
+    for (let r = 0; r < rowCount; r++) {
+      doc.setFillColor(...(r % 2 === 0 ? GRAY_50 : WHITE));
+      doc.rect(ML, y, CW, rowH, "F");
+
+      // Vertical column dividers
+      for (let vc = 1; vc < cols; vc++) {
+        const divX = ML + vc * colW;
+        if (r * cols + vc < posKeys.length || r === 0) {
+          doc.setDrawColor(...GRAY_200);
+          doc.setLineWidth(0.1);
+          doc.line(divX, y, divX, y + rowH);
         }
       }
-    });
-    const isOff = posList.length === 0;
 
-    let tx = ML;
+      for (let c = 0; c < cols; c++) {
+        const pi = r * cols + c;
+        if (pi >= posKeys.length) break;
 
-    // # column
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...(isOff ? GRAY_400 : NAVY));
-    doc.text(String(si + 1), tx + 5, y + 4.2);
-    tx += colW[0];
+        const pid = posKeys[pi];
+        const meta = POS_META[pid];
+        const x = ML + c * colW + 2;
 
-    // Date
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.setTextColor(...(isOff ? GRAY_400 : GRAY_700));
-    doc.text(`${String(sun.getDate()).padStart(2,"0")}/${String(sun.getMonth()+1).padStart(2,"0")}/${sun.getFullYear()}`, tx + 3, y + 4.2);
-    tx += colW[1];
+        // Position label
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(5);
+        doc.setTextColor(...meta.color);
+        doc.text(meta.label, x, y + 2.8);
 
-    // Position
-    if (posList.length > 0) {
-      doc.setFont("helvetica", isLead ? "bold" : "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...(isLead ? GOLD_DARK : GRAY_700));
-      doc.text(posList.join(", "), tx + 3, y + 4.2);
-    } else {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(...GRAY_400);
-      doc.text("—", tx + 3, y + 4.2);
+        // Musician name(s)
+        const nameStr = lineup[pid];
+        const hasMe = nameStr.includes("\u2605");
+        doc.setFont("helvetica", hasMe ? "bold" : "normal");
+        doc.setFontSize(6);
+        doc.setTextColor(...(nameStr === "\u2014" ? GRAY_400 : GRAY_700));
+
+        // Truncate if too long for column
+        const maxTextW = colW - 4;
+        let display = nameStr;
+        while (doc.getTextWidth(display) > maxTextW && display.length > 3) {
+          display = display.slice(0, -2) + "\u2026";
+        }
+        doc.text(display, x, y + 5.8);
+      }
+
+      // Bottom border of row
+      doc.setDrawColor(...GRAY_200);
+      doc.setLineWidth(0.1);
+      doc.line(ML, y + rowH, ML + CW, y + rowH);
+
+      y += rowH;
     }
-    tx += colW[2];
 
-    // Status badge
-    let badgeText, badgeBg, badgeTextColor;
-    if (isLead) { badgeText = "LEAD"; badgeBg = AMBER_BG; badgeTextColor = AMBER_D; }
-    else if (posList.length > 0) { badgeText = "Ativo"; badgeBg = GREEN_BG; badgeTextColor = GREEN_D; }
-    else { badgeText = "Folga"; badgeBg = GRAY_100; badgeTextColor = GRAY_500; }
-
-    doc.setFillColor(...badgeBg);
-    doc.roundedRect(tx + 2, y + 1, 20, 4.2, 1, 1, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(5.5);
-    doc.setTextColor(...badgeTextColor);
-    doc.text(badgeText, tx + 12, y + 4, { align: "center" });
-
-    y += rowH;
+    y += 2.5; // gap between Sundays
   });
 
-  // Bottom border
-  doc.setDrawColor(...GRAY_200);
-  doc.setLineWidth(0.3);
-  doc.line(ML, y, ML + CW, y);
-
-  return y + 3;
+  return y;
 }
 
 // ─── DRAW: FOOTER ────────────────────────────────────────────────────────────
@@ -519,7 +561,7 @@ function computeMonthData(mid, sched, sundays, blockDates) {
 }
 
 // ─── RENDER ONE MONTH PAGE ──────────────────────────────────────────────────
-function renderMonthPage(doc, musician, yr, mo, sched, blockDates, pageNum) {
+function renderMonthPage(doc, musician, yr, mo, sched, blockDates, pageNum, musicians) {
   const mid = musician.id;
   const vc = getVC(mid);
   const sundays = getSundays(yr, mo);
@@ -529,17 +571,14 @@ function renderMonthPage(doc, musician, yr, mo, sched, blockDates, pageNum) {
   let y = drawHeader(doc, musician, monthLabel, vc);
   y = drawStats(doc, data.stats, y);
   y = drawCalendar(doc, yr, mo, sundays, data.musicianSundays, data.blockedDatesList, data.leadSundays, vc, y);
-
-  // Two-column: Positions left, Detail table right (both below calendar)
-  // Actually, for clean Word-style: positions first, then table
   y = drawPositions(doc, data.positionsPlayed, musician.roles || [], y);
-  y = drawDetailTable(doc, sundays, sched, mid, y);
+  y = drawDetailTable(doc, sundays, sched, mid, musicians, y);
 
   drawFooter(doc, pageNum);
 }
 
 // ─── GENERATE SINGLE MUSICIAN REPORT ────────────────────────────────────────
-export function generateMusicianPDF(musician, allSchedules, blockDates) {
+export function generateMusicianPDF(musician, allSchedules, blockDates, musicians) {
   const monthKeys = Object.keys(allSchedules)
     .filter(k => allSchedules[k] && Object.keys(allSchedules[k]).length > 0).sort();
 
@@ -551,7 +590,7 @@ export function generateMusicianPDF(musician, allSchedules, blockDates) {
   monthKeys.forEach((mk, idx) => {
     const [yStr, mStr] = mk.split("-");
     if (idx > 0) doc.addPage();
-    renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, idx + 1);
+    renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, idx + 1, musicians || []);
   });
 
   return doc;
@@ -577,7 +616,7 @@ export function generateAllMusiciansPDF(musicians, allSchedules, blockDates) {
       if (!isFirst) doc.addPage();
       isFirst = false;
       pageNum++;
-      renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, pageNum);
+      renderMonthPage(doc, musician, parseInt(yStr), parseInt(mStr), allSchedules[mk], blockDates, pageNum, active);
     });
   });
 
