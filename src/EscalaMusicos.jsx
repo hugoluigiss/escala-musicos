@@ -1541,49 +1541,119 @@ export default function EscalaMusicos() {
                 )}</div>
               </div>
 
-              {/* ── LEAD DROUGHT ── */}
-              <div style={cardStyle}>
-                {sectionTitle("\u{1F525}", "Tempo sem Liderar")}
-                <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"14px", marginTop:"-8px" }}>
-                  Quem está há mais tempo sem ser vocal principal
-                </div>
-                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                  {vocalistDrought.map((v, idx) => {
-                    const vc = getVocalistColor(v.id);
-                    const isOverdue = v.daysSinceLastLead > 30;
-                    const droughtLabel = v.daysSinceLastLead >= 9999
-                      ? "Nunca liderou"
-                      : v.daysSinceLastLead === 0 ? "Hoje" : `${v.daysSinceLastLead} dias`;
-                    const barWidth = v.daysSinceLastLead >= 9999 ? 100 : Math.min((v.daysSinceLastLead / 90) * 100, 100);
-                    return (
-                      <div key={v.id} style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-                        <div style={{ width:"24px", textAlign:"center", fontSize:"14px", fontWeight:"900", color: idx === 0 ? "#ff6060" : "rgba(255,255,255,0.2)" }}>
-                          {idx + 1}
-                        </div>
-                        <div style={{ width:"10px", height:"10px", borderRadius:"50%", background: vc.tag, flexShrink:0 }} />
-                        <div style={{ width:"80px", fontWeight:"700", fontSize:"13px", color: vc.text }}>{v.short}</div>
-                        <div style={{ flex:1, position:"relative", height:"24px", background:"rgba(255,255,255,0.04)", borderRadius:"12px", overflow:"hidden" }}>
-                          <div style={{
-                            position:"absolute", left:0, top:0, height:"100%", borderRadius:"12px",
-                            width: `${barWidth}%`,
-                            background: isOverdue ? "linear-gradient(90deg, rgba(255,96,96,0.3), rgba(255,96,96,0.5))"
-                              : v.daysSinceLastLead >= 9999 ? "linear-gradient(90deg, rgba(255,68,68,0.4), rgba(255,68,68,0.7))"
-                              : "linear-gradient(90deg, rgba(201,169,110,0.2), rgba(201,169,110,0.4))",
-                            transition:"width 0.3s"
-                          }} />
-                          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"11px", fontWeight:"600",
-                            color: isOverdue || v.daysSinceLastLead >= 9999 ? "#ff8080" : "#c9a96e" }}>
-                            {droughtLabel}
-                          </div>
-                        </div>
-                        <div style={{ width:"60px", fontSize:"10px", color:"rgba(255,255,255,0.3)", textAlign:"right" }}>
-                          {v.totalLeads}x total
-                        </div>
+              {/* ── LEAD ROTATION TRACKER ── */}
+              {(() => {
+                // Build chronological lead history across all months (newest first)
+                const leadHistory = [];
+                const allVocalists = musicians.filter(m => m.roles.includes("vocal_principal") && !m.manualOnly);
+                const vocalistIds = new Set(allVocalists.map(m => m.id));
+                for (let mi = allMonthKeys.length - 1; mi >= 0; mi--) {
+                  const mk = allMonthKeys[mi];
+                  const sched = allSchedules[mk];
+                  const [y2, m2] = mk.split("-").map(Number);
+                  const suns2 = getSundays(y2, m2);
+                  for (let si = suns2.length - 1; si >= 0; si--) {
+                    const lid = sched[`${si}-vocal_principal-0`];
+                    if (lid && vocalistIds.has(lid)) {
+                      leadHistory.push({ id: lid, date: suns2[si], monthKey: mk, sundayIdx: si });
+                    }
+                  }
+                }
+                // Determine who already led in the current rotation cycle
+                // Walk from newest lead backward: once every vocalist has appeared, that's one full cycle
+                const seenInCycle = new Set();
+                const currentCycleLeads = [];
+                for (const entry of leadHistory) {
+                  if (seenInCycle.size >= allVocalists.length) break;
+                  if (!seenInCycle.has(entry.id)) {
+                    seenInCycle.add(entry.id);
+                    currentCycleLeads.push(entry);
+                  }
+                }
+                // Who still hasn't led in this cycle
+                const missingFromCycle = allVocalists.filter(m => !seenInCycle.has(m.id));
+                // The leadRotation queue tells us the order for next leads
+                const queueForDisplay = leadRotation.filter(id => vocalistIds.has(id));
+
+                return (
+                  <div style={cardStyle}>
+                    {sectionTitle("\u{1F504}", "Controle de Rotação de Leads")}
+                    <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"16px", marginTop:"-8px" }}>
+                      Todos devem liderar antes de alguém repetir
+                    </div>
+
+                    {/* Quem falta na rotação atual */}
+                    <div style={{ marginBottom:"18px" }}>
+                      <div style={{ fontSize:"10px", letterSpacing:"2px", color: missingFromCycle.length > 0 ? "#ff8c69" : "#5bc85b", textTransform:"uppercase", marginBottom:"10px", fontWeight:"700" }}>
+                        {missingFromCycle.length > 0
+                          ? `\u{26A0}\u{FE0F} Faltam ${missingFromCycle.length} na rotação atual`
+                          : "\u{2705} Todos já lideraram — ciclo completo!"}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
+                      {missingFromCycle.length > 0 && (
+                        <div style={{ display:"flex", gap:"8px", flexWrap:"wrap" }}>
+                          {missingFromCycle.map((m, i) => {
+                            const vc2 = getVocalistColor(m.id);
+                            const qIdx = queueForDisplay.indexOf(m.id);
+                            return (
+                              <div key={m.id} style={{
+                                padding:"8px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"700",
+                                background: qIdx === 0 ? vc2.bg : "rgba(255,140,105,0.1)",
+                                border: qIdx === 0 ? `2px solid ${vc2.border}` : "1px solid rgba(255,140,105,0.25)",
+                                color: qIdx === 0 ? vc2.text : "#ff8c69",
+                                position:"relative"
+                              }}>
+                                {qIdx === 0 && <span style={{ fontSize:"10px", marginRight:"4px" }}>{"\u2192"}</span>}
+                                {m.short}
+                                {qIdx >= 0 && <span style={{ fontSize:"9px", opacity:0.6, marginLeft:"4px" }}>#{qIdx + 1}</span>}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Histórico dos últimos leads */}
+                    <div>
+                      <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"10px", fontWeight:"700" }}>
+                        {"\u{1F4CB}"} Últimos Leads (mais recente primeiro)
+                      </div>
+                      <div style={{ display:"flex", flexDirection:"column", gap:"4px" }}>
+                        {leadHistory.slice(0, 12).map((entry, idx) => {
+                          const m = getMusicianById(entry.id);
+                          const vc2 = getVocalistColor(entry.id);
+                          const dateStr = `${String(entry.date.getDate()).padStart(2,"0")}/${String(entry.date.getMonth()+1).padStart(2,"0")}/${entry.date.getFullYear()}`;
+                          const isRecent = idx === 0;
+                          const alreadyLedInCycle = currentCycleLeads.some(c => c.id === entry.id);
+                          return (
+                            <div key={`${entry.id}-${idx}`} style={{
+                              display:"flex", alignItems:"center", gap:"10px", padding:"6px 10px",
+                              background: isRecent ? "rgba(232,168,56,0.08)" : "rgba(255,255,255,0.02)",
+                              borderRadius:"8px", borderLeft: `3px solid ${vc2.tag}`
+                            }}>
+                              <div style={{ width:"20px", fontSize:"11px", fontWeight:"800", color: isRecent ? "#c9a96e" : "rgba(255,255,255,0.15)", textAlign:"center" }}>
+                                {idx + 1}
+                              </div>
+                              <div style={{ width:"10px", height:"10px", borderRadius:"50%", background: vc2.tag, flexShrink:0 }} />
+                              <div style={{ width:"80px", fontWeight:"700", fontSize:"12px", color: vc2.text }}>{m?.short}</div>
+                              <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.5)", fontFamily:"monospace" }}>{dateStr}</div>
+                              <div style={{ flex:1 }} />
+                              <div style={{ fontSize:"9px", padding:"2px 8px", borderRadius:"8px",
+                                background: alreadyLedInCycle ? "rgba(91,200,91,0.15)" : "rgba(255,255,255,0.05)",
+                                color: alreadyLedInCycle ? "#5bc85b" : "rgba(255,255,255,0.25)",
+                                fontWeight:"600" }}>
+                                {alreadyLedInCycle ? "ciclo atual" : "ciclo anterior"}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {leadHistory.length === 0 && (
+                        <div style={{ fontSize:"12px", color:"rgba(255,255,255,0.3)", padding:"8px" }}>Nenhum lead registrado ainda.</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* ── PARTICIPAÇÃO MENSAL POR MÚSICO (HEATMAP) ── */}
               {monthData.length > 0 && (
