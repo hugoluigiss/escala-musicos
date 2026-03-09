@@ -251,8 +251,9 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
         break;
       }
     }
-    // If queue exhausted, refill with all auto lead vocalists and try again
-    if (!lead) {
+    // Only refill queue when ALL vocalists have had their turn (queue empty)
+    // If queue still has people (just blocked this Sunday), don't refill — keep them for next Sunday
+    if (!lead && leadQ.length === 0) {
       leadQ = [...autoLeadVocalists];
       for (let i = 0; i < leadQ.length; i++) {
         if (pool.has(leadQ[i])) {
@@ -441,20 +442,42 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, lea
       }
     }
   });
-  const leads = sundays.map((_, si) => schedule[`${si}-vocal_principal-0`]).filter(Boolean);
-  for (let i = 0; i < leads.length; i++) {
-    for (let j = i+1; j < leads.length; j++) {
-      if (leads[i] === leads[j]) {
-        const between = leads.slice(i+1, j);
+  // Build leads with Sunday indices for block-date aware checking
+  const leadsWithSi = sundays.map((_, si) => ({ si, lead: schedule[`${si}-vocal_principal-0`] })).filter(x => x.lead);
+  for (let i = 0; i < leadsWithSi.length; i++) {
+    for (let j = i+1; j < leadsWithSi.length; j++) {
+      if (leadsWithSi[i].lead === leadsWithSi[j].lead) {
+        const between = leadsWithSi.slice(i+1, j).map(x => x.lead);
+        // Sunday indices between the two lead appearances (where someone else could have led)
+        const sundayIndicesBetween = leadsWithSi.slice(i+1, j).map(x => x.si);
+        // Include the Sunday j itself as a slot where they could have been assigned
+        const availableSlots = [...sundayIndicesBetween, leadsWithSi[j].si];
+
         const allLeads = leadVocalists.filter(id => {
           const m = getMusicianById(id);
+          if (m?.manualOnly) return false; // Exclude manual-only musicians
           return !(m?.maxPerMonth && (sundaysByMusician[id]||[]).length >= m.maxPerMonth);
         });
-        const notYetLed = allLeads.filter(id => !between.includes(id) && id !== leads[i]);
+        const notYetLed = allLeads.filter(id => {
+          if (between.includes(id) || id === leadsWithSi[i].lead) return false;
+          // If this person was blocked on ALL available slots, they couldn't have led — don't flag
+          if (blockDates && typeof blockDates === "object") {
+            const blocked = blockDates[id];
+            if (Array.isArray(blocked) && blocked.length > 0) {
+              const wasBlockedOnAll = availableSlots.every(si => {
+                const dk = dateKey(sundays[si]);
+                return blocked.includes(dk);
+              });
+              if (wasBlockedOnAll) return false;
+            }
+          }
+          return true;
+        });
         if (notYetLed.length > 0) {
-          const m = getMusicianById(leads[i]);
+          const m = getMusicianById(leadsWithSi[i].lead);
+          const skippedNames = notYetLed.map(id => getMusicianById(id)?.short).filter(Boolean).join(", ");
           conflicts.push({ type: "lead_repeat", severity: "warning",
-            msg: `${m?.name} lidera 2x antes de todos vocais liderarem (dom ${i+1} e ${j+1})` });
+            msg: `${m?.name} lidera 2x antes de todos vocais liderarem (dom ${leadsWithSi[i].si+1} e ${leadsWithSi[j].si+1}) — faltam: ${skippedNames}` });
         }
       }
     }
@@ -479,6 +502,7 @@ export default function EscalaMusicos() {
   const [blockDates, setBlockDates] = useState({});
   const [showExport, setShowExport] = useState(false);
   const [exportRange, setExportRange] = useState("current"); // "current" | "custom"
+  const [exportType, setExportType] = useState("complete"); // "schedule" | "complete"
   const [exportFromMonth, setExportFromMonth] = useState(today.getMonth());
   const [exportFromYear, setExportFromYear] = useState(today.getFullYear());
   const [exportToMonth, setExportToMonth] = useState(today.getMonth());
@@ -615,7 +639,7 @@ export default function EscalaMusicos() {
   }
 
   // ── Export helpers ──
-  function buildExportHTML(monthsToExport) {
+  function buildExportHTML(monthsToExport, includeStats = true) {
     let html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Escala de Músicos</title>
 <style>
   body { font-family: Georgia, serif; background: #fff; color: #222; padding: 20px; max-width: 900px; margin: 0 auto; }
@@ -678,16 +702,18 @@ export default function EscalaMusicos() {
       });
       html += `</tr></tbody></table>`;
 
-      // Stats
-      html += `<div class="stats"><div class="stats-grid">`;
-      musicians.forEach(mus => {
-        const present = new Set();
-        Object.entries(sched).forEach(([k, v]) => { if (v === mus.id) present.add(parseInt(k.split("-")[0])); });
-        const count = present.size;
-        const leads = suns.filter((_, si) => sched[`${si}-vocal_principal-0`] === mus.id).length;
-        html += `<div class="stat-card"><div class="stat-name">${mus.short}</div>${count}x escalado \u2022 ${suns.length - count}x folga${leads > 0 ? ` \u2022 ${leads}x lead` : ''}</div>`;
-      });
-      html += `</div></div>`;
+      // Stats (only if includeStats)
+      if (includeStats) {
+        html += `<div class="stats"><div class="stats-grid">`;
+        musicians.forEach(mus => {
+          const present = new Set();
+          Object.entries(sched).forEach(([k, v]) => { if (v === mus.id) present.add(parseInt(k.split("-")[0])); });
+          const count = present.size;
+          const leads = suns.filter((_, si) => sched[`${si}-vocal_principal-0`] === mus.id).length;
+          html += `<div class="stat-card"><div class="stat-name">${mus.short}</div>${count}x escalado \u2022 ${suns.length - count}x folga${leads > 0 ? ` \u2022 ${leads}x lead` : ''}</div>`;
+        });
+        html += `</div></div>`;
+      }
     }
 
     html += `<div class="footer">Gerado pelo sistema Escala de Músicos \u2022 HLSS Prime Services \u2022 ${new Date().toLocaleDateString("pt-BR")}</div>`;
@@ -711,13 +737,15 @@ export default function EscalaMusicos() {
       }
     }
 
-    const html = buildExportHTML(monthsToExport);
+    const includeStats = exportType === "complete";
+    const html = buildExportHTML(monthsToExport, includeStats);
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
+    const prefix = includeStats ? "Relatorio_Completo" : "Escala";
     const title = monthsToExport.length === 1
-      ? `Escala_${MONTHS[monthsToExport[0].m]}_${monthsToExport[0].y}`
-      : `Escala_${MONTHS[monthsToExport[0].m]}${monthsToExport[0].y}_a_${MONTHS[monthsToExport[monthsToExport.length-1].m]}${monthsToExport[monthsToExport.length-1].y}`;
+      ? `${prefix}_${MONTHS[monthsToExport[0].m]}_${monthsToExport[0].y}`
+      : `${prefix}_${MONTHS[monthsToExport[0].m]}${monthsToExport[0].y}_a_${MONTHS[monthsToExport[monthsToExport.length-1].m]}${monthsToExport[monthsToExport.length-1].y}`;
     a.href = url;
     a.download = `${title}.html`;
     document.body.appendChild(a);
@@ -743,7 +771,8 @@ export default function EscalaMusicos() {
       }
     }
 
-    const html = buildExportHTML(monthsToExport);
+    const includeStats = exportType === "complete";
+    const html = buildExportHTML(monthsToExport, includeStats);
     const win = window.open("", "_blank");
     win.document.write(html);
     win.document.close();
@@ -896,6 +925,27 @@ export default function EscalaMusicos() {
             <div onClick={e => e.stopPropagation()} style={{ background:"#1a1635", border:"1px solid rgba(201,169,110,0.3)", borderRadius:"16px", padding:"28px", maxWidth:"420px", width:"90%", boxShadow:"0 20px 60px rgba(0,0,0,0.5)" }}>
               <div style={{ fontSize:"18px", fontWeight:"700", color:"#f0e6d3", marginBottom:"4px" }}>{"\u{1F4E4}"} Exportar Escala</div>
               <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.4)", marginBottom:"20px" }}>Gere um arquivo HTML para imprimir ou salvar</div>
+
+              <div style={{ marginBottom:"16px" }}>
+                <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"8px" }}>Tipo de Relatório</div>
+                <div style={{ display:"flex", gap:"8px" }}>
+                  <button onClick={() => setExportType("schedule")} style={{
+                    flex:1, padding:"10px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia, serif",
+                    background: exportType==="schedule" ? "rgba(105,180,255,0.2)" : "rgba(255,255,255,0.04)",
+                    border: exportType==="schedule" ? "1px solid rgba(105,180,255,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                    color: exportType==="schedule" ? "#69b4ff" : "rgba(255,255,255,0.5)"
+                  }}>{"\u{1F4CB}"} Só Escalas</button>
+                  <button onClick={() => setExportType("complete")} style={{
+                    flex:1, padding:"10px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontFamily:"Georgia, serif",
+                    background: exportType==="complete" ? "rgba(105,180,255,0.2)" : "rgba(255,255,255,0.04)",
+                    border: exportType==="complete" ? "1px solid rgba(105,180,255,0.4)" : "1px solid rgba(255,255,255,0.1)",
+                    color: exportType==="complete" ? "#69b4ff" : "rgba(255,255,255,0.5)"
+                  }}>{"\u{1F4CA}"} Completo</button>
+                </div>
+                <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)", marginTop:"6px", textAlign:"center" }}>
+                  {exportType === "schedule" ? "Apenas o calendário das escalas" : "Calendário + resumo estatístico de cada músico"}
+                </div>
+              </div>
 
               <div style={{ marginBottom:"16px" }}>
                 <div style={{ fontSize:"10px", letterSpacing:"2px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"8px" }}>Período</div>
@@ -1140,6 +1190,60 @@ export default function EscalaMusicos() {
                     ];
                   });
                 })}
+              </div>
+            )}
+            {/* ── RESUMO INLINE (below schedule grid) ── */}
+            {hasData && (
+              <div style={{ marginTop:"24px" }}>
+                <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"12px", padding:"0 4px" }}>{"\u{1F4CA}"} Resumo do Mês</div>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(155px, 1fr))", gap:"10px" }}>
+                  {stats.map(m => {
+                    const hasFolga = m.offWeeks >= 1;
+                    const color = hasFolga ? "#5bc85b" : (m.noFolgaRequired ? "#c9a96e" : "#ff6060");
+                    const vc = getVocalistColor(m.id);
+                    const isVocalist = leadVocalists.includes(m.id);
+                    const blockedCount = getBlockedCountForMonth(m.id);
+                    return (
+                      <div key={m.id} style={{
+                        background:"rgba(255,255,255,0.03)",
+                        border: isVocalist ? `1px solid ${vc.border}` : `1px solid ${hasFolga||m.noFolgaRequired?"rgba(91,200,91,0.2)":"rgba(255,96,96,0.2)"}`,
+                        borderRadius:"12px", padding:"14px",
+                        borderLeft: isVocalist ? `3px solid ${vc.tag}` : undefined
+                      }}>
+                        <div style={{ fontSize:"13px", fontWeight:"700", color: isVocalist ? vc.text : "#f0e6d3", marginBottom:"2px" }}>{m.short}</div>
+                        <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)", marginBottom:"10px" }}>
+                          {m.name !== m.short ? m.name.replace(m.short,"").trim() : ""}
+                          {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> {"\u2022"} máx {m.maxPerMonth}x</span>}
+                          {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
+                          {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
+                          {blockedCount > 0 && <span style={{ color:"#ff8c69" }}> {"\u2022"} {blockedCount} bloqueio{blockedCount>1?"s":""}</span>}
+                          {m.manualOnly && <span style={{ color:"#ff8c69" }}> {"\u2022"} manual</span>}
+                        </div>
+                        <div style={{ display:"flex", gap:"4px", marginBottom:"8px" }}>
+                          {sundays.map((_,i) => {
+                            const isLeadHere = schedule[`${i}-vocal_principal-0`] === m.id;
+                            const isBlocked = isDateBlocked(m.id, sundays[i]);
+                            return (
+                              <div key={i} style={{
+                                width:"20px", height:"20px", borderRadius:"5px", fontSize:"9px", fontWeight:"700",
+                                background: isBlocked ? "rgba(255,68,68,0.3)" : (isOnSunday(m.id,i) ? (isLeadHere ? vc.tag : (isVocalist ? `${vc.tag}88` : "#c9a96e")) : "rgba(255,255,255,0.07)"),
+                                color: isBlocked ? "#ff4444" : (isOnSunday(m.id,i) ? "#0d0b1e" : "rgba(255,255,255,0.25)"),
+                                display:"flex", alignItems:"center", justifyContent:"center",
+                                border: isBlocked ? "1px solid rgba(255,68,68,0.5)" : "none"
+                              }}>{isBlocked ? "\u2715" : (isLeadHere ? "L" : i+1)}</div>
+                            );
+                          })}
+                        </div>
+                        <div style={{ fontSize:"11px", color }}>
+                          {m.count}x escalado {"\u2022"} {m.offWeeks}x folga
+                        </div>
+                        {m.leadsThisMonth > 0 && (
+                          <div style={{ fontSize:"10px", color: vc.tag, marginTop:"2px" }}>{"\u{1F3A4}"} Lead {m.leadsThisMonth}x</div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
@@ -1540,7 +1644,7 @@ export default function EscalaMusicos() {
                 "Ana Tiscianeli: máximo 1x por mês",
                 "Madalena: domingos alternados (1 sim, 1 não)",
                 "Casais Asafe/Jokasta e Leandro/Aline: SEMPRE folga juntos",
-                "Lead Vocal: rotação completa antes de repetir",
+                "Lead Vocal: todos devem liderar antes de alguém repetir (bloqueados não contam como pulados)",
                 "Hugo e Leandro: quando vocal, automaticamente no violão (se não precisar cobrir teclado)",
                 "Teclado e Bateria: SEMPRE obrigatórios",
                 "Back Vocal #3: pode ficar vazio quando necessário",
