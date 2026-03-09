@@ -1052,6 +1052,7 @@ export default function EscalaMusicos() {
           {[
             ["escala","\u{1F4CB} Escala"],
             ["resumo","\u{1F4CA} Resumo"],
+            ["dashboard","\u{1F4C8} Dashboard"],
             ["bloqueios",`\u{1F6AB} Datas${totalBlockedThisMonth > 0 ? ` (${totalBlockedThisMonth})` : ""}`],
             ["musicos","\u{1F3B6} Músicos"],
             ["conflitos",`\u26A0\uFE0F Conflitos ${conflicts.length > 0 ? `(${conflicts.length})` : ""}`]
@@ -1401,6 +1402,367 @@ export default function EscalaMusicos() {
             </>)}
           </div>
         )}
+
+        {/* ── TAB: DASHBOARD ── */}
+        {activeTab === "dashboard" && (() => {
+          // ── Compute multi-month data across ALL saved schedules ──
+          const allMonthKeys = Object.keys(allSchedules).filter(k => Object.keys(allSchedules[k]).length > 0).sort();
+          const monthData = allMonthKeys.map(mk => {
+            const [y, m] = mk.split("-").map(Number);
+            const suns = getSundays(y, m);
+            const sched = allSchedules[mk];
+            const perMusician = {};
+            musicians.forEach(mus => {
+              const present = new Set();
+              Object.entries(sched).forEach(([k, v]) => { if (v === mus.id) present.add(parseInt(k.split("-")[0])); });
+              const leads = suns.filter((_, si) => sched[`${si}-vocal_principal-0`] === mus.id).length;
+              const positions = {};
+              POSITIONS.forEach(pos => {
+                let count = 0;
+                for (let slot = 0; slot < pos.count; slot++) {
+                  for (let si = 0; si < suns.length; si++) {
+                    if (sched[`${si}-${pos.id}-${slot}`] === mus.id) count++;
+                  }
+                }
+                if (count > 0) positions[pos.id] = count;
+              });
+              perMusician[mus.id] = { count: present.size, folgas: suns.length - present.size, leads, sundays: suns.length, positions };
+            });
+            return { key: mk, y, m, label: `${MONTHS[m].substring(0,3)} ${y}`, sundays: suns.length, perMusician };
+          });
+
+          // ── Global totals ──
+          const globalTotals = {};
+          musicians.forEach(mus => {
+            let totalPlays = 0, totalLeads = 0, totalFolgas = 0, totalSundays = 0, lastLeadMonth = null, lastLeadSi = -1;
+            const positionTotals = {};
+            monthData.forEach(md => {
+              const d = md.perMusician[mus.id];
+              if (!d) return;
+              totalPlays += d.count;
+              totalLeads += d.leads;
+              totalFolgas += d.folgas;
+              totalSundays += d.sundays;
+              Object.entries(d.positions || {}).forEach(([posId, cnt]) => {
+                positionTotals[posId] = (positionTotals[posId] || 0) + cnt;
+              });
+              if (d.leads > 0) lastLeadMonth = md;
+            });
+            // Find exact last lead Sunday across all months
+            let lastLeadDate = null;
+            for (let mi = allMonthKeys.length - 1; mi >= 0; mi--) {
+              const mk = allMonthKeys[mi];
+              const sched = allSchedules[mk];
+              const [y2, m2] = mk.split("-").map(Number);
+              const suns2 = getSundays(y2, m2);
+              for (let si = suns2.length - 1; si >= 0; si--) {
+                if (sched[`${si}-vocal_principal-0`] === mus.id) {
+                  lastLeadDate = suns2[si];
+                  break;
+                }
+              }
+              if (lastLeadDate) break;
+            }
+            globalTotals[mus.id] = {
+              totalPlays, totalLeads, totalFolgas, totalSundays, positionTotals, lastLeadMonth, lastLeadDate,
+              avgPerMonth: monthData.length > 0 ? (totalPlays / monthData.length).toFixed(1) : "0",
+              participationRate: totalSundays > 0 ? Math.round((totalPlays / totalSundays) * 100) : 0
+            };
+          });
+
+          // ── Lead drought ranking (vocalists only, sorted by longest without leading) ──
+          const vocalistDrought = musicians
+            .filter(m => m.roles.includes("vocal_principal") && !m.manualOnly)
+            .map(m => {
+              const g = globalTotals[m.id];
+              const daysSinceLastLead = g.lastLeadDate
+                ? Math.floor((new Date() - g.lastLeadDate) / (1000 * 60 * 60 * 24))
+                : 9999;
+              return { ...m, ...g, daysSinceLastLead };
+            })
+            .sort((a, b) => b.daysSinceLastLead - a.daysSinceLastLead);
+
+          // ── Most/least active musicians ──
+          const activeRanking = musicians
+            .filter(m => !m.manualOnly)
+            .map(m => ({ ...m, ...globalTotals[m.id] }))
+            .sort((a, b) => b.participationRate - a.participationRate);
+
+          // ── Position coverage per month ──
+          const positionCoverage = monthData.map(md => {
+            const sched = allSchedules[md.key];
+            const coverage = {};
+            POSITIONS.forEach(pos => {
+              let filled = 0, total = md.sundays * (pos.id === "vocal_back" ? pos.minCount || 2 : 1);
+              for (let si = 0; si < md.sundays; si++) {
+                if (pos.id === "vocal_back") {
+                  const bCount = [0,1,2].filter(s => sched[`${si}-vocal_back-${s}`]).length;
+                  filled += Math.min(bCount, pos.minCount || 2);
+                } else {
+                  if (sched[`${si}-${pos.id}-0`]) filled++;
+                }
+              }
+              coverage[pos.id] = { filled, total, pct: total > 0 ? Math.round((filled / total) * 100) : 0 };
+            });
+            return { ...md, coverage };
+          });
+
+          const cardStyle = { background:"rgba(255,255,255,0.03)", borderRadius:"14px", padding:"18px 20px", border:"1px solid rgba(255,255,255,0.06)" };
+          const sectionTitle = (icon, text) => (
+            <div style={{ fontSize:"11px", letterSpacing:"4px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"14px", display:"flex", alignItems:"center", gap:"8px" }}>
+              <span style={{ fontSize:"16px" }}>{icon}</span>{text}
+            </div>
+          );
+          const statNum = (val, label, color = "#f0e6d3") => (
+            <div style={{ textAlign:"center" }}>
+              <div style={{ fontSize:"26px", fontWeight:"900", color, lineHeight:1 }}>{val}</div>
+              <div style={{ fontSize:"9px", color:"rgba(255,255,255,0.35)", letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px" }}>{label}</div>
+            </div>
+          );
+
+          return (
+            <div style={{ display:"flex", flexDirection:"column", gap:"20px" }}>
+              {/* ── TOP SUMMARY CARDS ── */}
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fit, minmax(140px, 1fr))", gap:"12px" }}>
+                <div style={cardStyle}>{statNum(allMonthKeys.length, "Meses com escala", "#c9a96e")}</div>
+                <div style={cardStyle}>{statNum(monthData.reduce((s, md) => s + md.sundays, 0), "Total de domingos", "#69b4ff")}</div>
+                <div style={cardStyle}>{statNum(musicians.filter(m => !m.manualOnly).length, "Músicos ativos", "#5bc8af")}</div>
+                <div style={cardStyle}>{statNum(musicians.filter(m => m.roles.includes("vocal_principal") && !m.manualOnly).length, "Vocalistas", "#e8a838")}</div>
+                <div style={cardStyle}>{statNum(
+                  monthData.length > 0 ? (monthData.reduce((s, md) => {
+                    const sched = allSchedules[md.key];
+                    let cnt = 0;
+                    for (let si = 0; si < md.sundays; si++) { if (sched[`${si}-vocal_principal-0`]) cnt++; }
+                    return s + cnt;
+                  }, 0)) : 0,
+                  "Total de leads", "#ff8c69"
+                )}</div>
+              </div>
+
+              {/* ── LEAD DROUGHT ── */}
+              <div style={cardStyle}>
+                {sectionTitle("\u{1F525}", "Tempo sem Liderar")}
+                <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"14px", marginTop:"-8px" }}>
+                  Quem está há mais tempo sem ser vocal principal
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {vocalistDrought.map((v, idx) => {
+                    const vc = getVocalistColor(v.id);
+                    const isOverdue = v.daysSinceLastLead > 30;
+                    const droughtLabel = v.daysSinceLastLead >= 9999
+                      ? "Nunca liderou"
+                      : v.daysSinceLastLead === 0 ? "Hoje" : `${v.daysSinceLastLead} dias`;
+                    const barWidth = v.daysSinceLastLead >= 9999 ? 100 : Math.min((v.daysSinceLastLead / 90) * 100, 100);
+                    return (
+                      <div key={v.id} style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                        <div style={{ width:"24px", textAlign:"center", fontSize:"14px", fontWeight:"900", color: idx === 0 ? "#ff6060" : "rgba(255,255,255,0.2)" }}>
+                          {idx + 1}
+                        </div>
+                        <div style={{ width:"10px", height:"10px", borderRadius:"50%", background: vc.tag, flexShrink:0 }} />
+                        <div style={{ width:"80px", fontWeight:"700", fontSize:"13px", color: vc.text }}>{v.short}</div>
+                        <div style={{ flex:1, position:"relative", height:"24px", background:"rgba(255,255,255,0.04)", borderRadius:"12px", overflow:"hidden" }}>
+                          <div style={{
+                            position:"absolute", left:0, top:0, height:"100%", borderRadius:"12px",
+                            width: `${barWidth}%`,
+                            background: isOverdue ? "linear-gradient(90deg, rgba(255,96,96,0.3), rgba(255,96,96,0.5))"
+                              : v.daysSinceLastLead >= 9999 ? "linear-gradient(90deg, rgba(255,68,68,0.4), rgba(255,68,68,0.7))"
+                              : "linear-gradient(90deg, rgba(201,169,110,0.2), rgba(201,169,110,0.4))",
+                            transition:"width 0.3s"
+                          }} />
+                          <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"11px", fontWeight:"600",
+                            color: isOverdue || v.daysSinceLastLead >= 9999 ? "#ff8080" : "#c9a96e" }}>
+                            {droughtLabel}
+                          </div>
+                        </div>
+                        <div style={{ width:"60px", fontSize:"10px", color:"rgba(255,255,255,0.3)", textAlign:"right" }}>
+                          {v.totalLeads}x total
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── PARTICIPAÇÃO MENSAL POR MÚSICO (HEATMAP) ── */}
+              {monthData.length > 0 && (
+                <div style={cardStyle}>
+                  {sectionTitle("\u{1F4C5}", "Participação Mensal")}
+                  <div style={{ overflowX:"auto" }}>
+                    <div style={{ display:"grid", gridTemplateColumns:`120px repeat(${monthData.length}, minmax(55px, 1fr))`, gap:"2px", minWidth: monthData.length > 6 ? `${120 + monthData.length * 58}px` : "auto" }}>
+                      {/* Header */}
+                      <div style={{ padding:"8px 4px", fontSize:"9px", color:"#c9a96e", fontWeight:"700", letterSpacing:"1px" }}>MÚSICO</div>
+                      {monthData.map(md => (
+                        <div key={md.key} style={{ padding:"8px 4px", fontSize:"10px", color:"#c9a96e", fontWeight:"600", textAlign:"center" }}>{md.label}</div>
+                      ))}
+                      {/* Rows */}
+                      {musicians.filter(m => !m.manualOnly).map(mus => {
+                        const vc = getVocalistColor(mus.id);
+                        const isVocalist = mus.roles.includes("vocal_principal");
+                        return [
+                          <div key={`name-${mus.id}`} style={{ padding:"6px 8px", fontSize:"12px", fontWeight:"600", color: isVocalist ? vc.text : "#f0e6d3", display:"flex", alignItems:"center", gap:"6px", borderLeft: isVocalist ? `3px solid ${vc.tag}` : "3px solid transparent" }}>
+                            {mus.short}
+                          </div>,
+                          ...monthData.map(md => {
+                            const d = md.perMusician[mus.id];
+                            if (!d) return <div key={`${mus.id}-${md.key}`} style={{ padding:"6px", textAlign:"center" }}>—</div>;
+                            const intensity = d.sundays > 0 ? d.count / d.sundays : 0;
+                            const bg = intensity > 0.8 ? "rgba(91,200,91,0.25)" : intensity > 0.5 ? "rgba(201,169,110,0.2)" : intensity > 0 ? "rgba(255,140,105,0.15)" : "rgba(255,255,255,0.02)";
+                            return (
+                              <div key={`${mus.id}-${md.key}`} style={{ padding:"6px 4px", textAlign:"center", background: bg, borderRadius:"6px", fontSize:"11px" }}>
+                                <div style={{ fontWeight:"700", color:"#f0e6d3" }}>{d.count}<span style={{ color:"rgba(255,255,255,0.3)", fontWeight:"400" }}>/{d.sundays}</span></div>
+                                {d.leads > 0 && <div style={{ fontSize:"8px", color: vc.tag, fontWeight:"700", marginTop:"1px" }}>{"\u{1F3A4}"}{d.leads}</div>}
+                              </div>
+                            );
+                          })
+                        ];
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── RANKING DE PARTICIPAÇÃO ── */}
+              <div style={cardStyle}>
+                {sectionTitle("\u{1F3C6}", "Ranking de Participação")}
+                <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"14px", marginTop:"-8px" }}>
+                  Taxa de participação geral (considerando todos os meses com escala)
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"6px" }}>
+                  {activeRanking.map((m, idx) => {
+                    const vc = getVocalistColor(m.id);
+                    const isVocalist = m.roles.includes("vocal_principal");
+                    const rateColor = m.participationRate > 80 ? "#5bc85b" : m.participationRate > 60 ? "#c9a96e" : m.participationRate > 40 ? "#ff8c69" : "#ff6060";
+                    return (
+                      <div key={m.id} style={{ display:"flex", alignItems:"center", gap:"10px", padding:"8px 12px", background:"rgba(255,255,255,0.02)", borderRadius:"10px", borderLeft: isVocalist ? `3px solid ${vc.tag}` : "3px solid transparent" }}>
+                        <div style={{ width:"22px", fontSize:"13px", fontWeight:"900", color: idx < 3 ? "#c9a96e" : "rgba(255,255,255,0.2)", textAlign:"center" }}>{idx+1}</div>
+                        <div style={{ flex:1 }}>
+                          <div style={{ fontSize:"13px", fontWeight:"700", color: isVocalist ? vc.text : "#f0e6d3" }}>{m.short}</div>
+                          <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.3)" }}>
+                            {m.totalPlays}x em {m.totalSundays} dom · {m.totalFolgas} folgas · média {m.avgPerMonth}/mês
+                            {m.totalLeads > 0 && <span style={{ color: vc.tag }}> · {m.totalLeads}x lead</span>}
+                          </div>
+                        </div>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                          <div style={{ width:"80px", height:"8px", background:"rgba(255,255,255,0.06)", borderRadius:"4px", overflow:"hidden" }}>
+                            <div style={{ width:`${m.participationRate}%`, height:"100%", background: rateColor, borderRadius:"4px" }} />
+                          </div>
+                          <div style={{ width:"40px", fontSize:"13px", fontWeight:"700", color: rateColor, textAlign:"right" }}>{m.participationRate}%</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* ── COBERTURA DE POSIÇÕES POR MÊS ── */}
+              {positionCoverage.length > 0 && (
+                <div style={cardStyle}>
+                  {sectionTitle("\u{1F3AF}", "Cobertura de Posições")}
+                  <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"14px", marginTop:"-8px" }}>
+                    Percentual de preenchimento das posições obrigatórias por mês
+                  </div>
+                  <div style={{ overflowX:"auto" }}>
+                    <div style={{ display:"grid", gridTemplateColumns:`120px repeat(${positionCoverage.length}, minmax(55px, 1fr))`, gap:"2px" }}>
+                      <div style={{ padding:"8px 4px", fontSize:"9px", color:"#c9a96e", fontWeight:"700", letterSpacing:"1px" }}>POSIÇÃO</div>
+                      {positionCoverage.map(md => (
+                        <div key={md.key} style={{ padding:"8px 4px", fontSize:"10px", color:"#c9a96e", fontWeight:"600", textAlign:"center" }}>{md.label}</div>
+                      ))}
+                      {POSITIONS.filter(p => p.required || p.id === "vocal_back").map(pos => [
+                        <div key={`pos-${pos.id}`} style={{ padding:"6px 8px", fontSize:"12px", fontWeight:"600", color: pos.color, display:"flex", alignItems:"center", gap:"6px" }}>
+                          <span>{pos.icon}</span>{pos.label}
+                        </div>,
+                        ...positionCoverage.map(md => {
+                          const cov = md.coverage[pos.id];
+                          if (!cov) return <div key={`${pos.id}-${md.key}`} />;
+                          const color = cov.pct === 100 ? "#5bc85b" : cov.pct >= 80 ? "#c9a96e" : "#ff6060";
+                          return (
+                            <div key={`${pos.id}-${md.key}`} style={{ padding:"6px 4px", textAlign:"center", borderRadius:"6px", background: cov.pct === 100 ? "rgba(91,200,91,0.1)" : cov.pct >= 80 ? "rgba(201,169,110,0.1)" : "rgba(255,96,96,0.1)" }}>
+                              <div style={{ fontSize:"13px", fontWeight:"700", color }}>{cov.pct}%</div>
+                              <div style={{ fontSize:"8px", color:"rgba(255,255,255,0.25)" }}>{cov.filled}/{cov.total}</div>
+                            </div>
+                          );
+                        })
+                      ])}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ── DETALHAMENTO POR POSIÇÃO (totais globais) ── */}
+              <div style={cardStyle}>
+                {sectionTitle("\u{1F3B6}", "Atuação por Posição")}
+                <div style={{ fontSize:"11px", color:"rgba(255,255,255,0.35)", marginBottom:"14px", marginTop:"-8px" }}>
+                  Quantas vezes cada músico atuou em cada posição (todos os meses)
+                </div>
+                <div style={{ overflowX:"auto" }}>
+                  <div style={{ display:"grid", gridTemplateColumns:`120px repeat(${POSITIONS.length}, minmax(70px, 1fr))`, gap:"2px" }}>
+                    <div style={{ padding:"8px 4px", fontSize:"9px", color:"#c9a96e", fontWeight:"700" }}>MÚSICO</div>
+                    {POSITIONS.map(pos => (
+                      <div key={pos.id} style={{ padding:"8px 4px", fontSize:"9px", color: pos.color, fontWeight:"600", textAlign:"center" }}>
+                        {pos.icon} {pos.label.split(" ").pop()}
+                      </div>
+                    ))}
+                    {musicians.filter(m => !m.manualOnly).map(mus => {
+                      const vc = getVocalistColor(mus.id);
+                      const isVocalist = mus.roles.includes("vocal_principal");
+                      const g = globalTotals[mus.id];
+                      return [
+                        <div key={`pn-${mus.id}`} style={{ padding:"6px 8px", fontSize:"12px", fontWeight:"600", color: isVocalist ? vc.text : "#f0e6d3", borderLeft: isVocalist ? `3px solid ${vc.tag}` : "3px solid transparent" }}>
+                          {mus.short}
+                        </div>,
+                        ...POSITIONS.map(pos => {
+                          const cnt = g.positionTotals[pos.id] || 0;
+                          const hasRole = mus.roles.includes(pos.id);
+                          return (
+                            <div key={`${mus.id}-${pos.id}`} style={{
+                              padding:"6px 4px", textAlign:"center", borderRadius:"6px", fontSize:"12px", fontWeight: cnt > 0 ? "700" : "400",
+                              color: !hasRole ? "rgba(255,255,255,0.08)" : cnt > 0 ? pos.color : "rgba(255,255,255,0.2)",
+                              background: cnt > 0 ? `${pos.color}12` : "transparent"
+                            }}>
+                              {hasRole ? (cnt || "—") : ""}
+                            </div>
+                          );
+                        })
+                      ];
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── LEAD DISTRIBUTION PIE (text-based) ── */}
+              <div style={cardStyle}>
+                {sectionTitle("\u{1F3A4}", "Distribuição de Leads")}
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(160px, 1fr))", gap:"10px" }}>
+                  {vocalistDrought.sort((a, b) => b.totalLeads - a.totalLeads).map(v => {
+                    const vc = getVocalistColor(v.id);
+                    const totalLeadsAll = vocalistDrought.reduce((s, x) => s + x.totalLeads, 0);
+                    const pct = totalLeadsAll > 0 ? Math.round((v.totalLeads / totalLeadsAll) * 100) : 0;
+                    return (
+                      <div key={v.id} style={{ padding:"14px", borderRadius:"12px", background:"rgba(255,255,255,0.02)", border: `1px solid ${vc.border}`, borderLeft: `3px solid ${vc.tag}` }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                          <span style={{ fontWeight:"700", fontSize:"14px", color: vc.text }}>{v.short}</span>
+                          <span style={{ fontSize:"20px", fontWeight:"900", color: vc.tag }}>{v.totalLeads}x</span>
+                        </div>
+                        <div style={{ height:"6px", background:"rgba(255,255,255,0.06)", borderRadius:"3px", overflow:"hidden", marginBottom:"6px" }}>
+                          <div style={{ width:`${pct}%`, height:"100%", background: vc.tag, borderRadius:"3px" }} />
+                        </div>
+                        <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)" }}>
+                          {pct}% dos leads · última: {v.lastLeadDate ? `${fmt(v.lastLeadDate)}` : "nunca"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {allMonthKeys.length === 0 && (
+                <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(240,230,211,0.3)", fontSize:"15px" }}>
+                  Gere escalas para visualizar o dashboard com estatísticas do time
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* ── TAB: BLOQUEIOS (Block Dates) ── */}
         {activeTab === "bloqueios" && (
