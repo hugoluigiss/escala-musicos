@@ -508,6 +508,7 @@ export default function EscalaMusicos() {
   const [exportFromYear, setExportFromYear] = useState(today.getFullYear());
   const [exportToMonth, setExportToMonth] = useState(today.getMonth());
   const [exportToYear, setExportToYear] = useState(today.getFullYear());
+  const [reportSelectedMonths, setReportSelectedMonths] = useState(null); // null = all, or Set of month keys
   const saveTimers = useRef({});
   const monthKey = `${year}-${month}`;
   const sundays = getSundays(year, month);
@@ -1757,27 +1758,74 @@ export default function EscalaMusicos() {
               </div>
 
               {/* ── PDF REPORTS SECTION ── */}
-              {allMonthKeys.length > 0 && (
+              {allMonthKeys.length > 0 && (() => {
+                const selectedMK = reportSelectedMonths || new Set(allMonthKeys);
+                const filteredSchedules = {};
+                allMonthKeys.forEach(mk => { if (selectedMK.has(mk)) filteredSchedules[mk] = allSchedules[mk]; });
+                const hasSelection = Object.keys(filteredSchedules).length > 0;
+                const selCount = selectedMK.size;
+                const selLabel = selCount === allMonthKeys.length ? "todos os meses" : `${selCount} ${selCount === 1 ? "mês" : "meses"}`;
+
+                return (
                 <div style={cardStyle}>
                   {sectionTitle("\u{1F4C4}", "Relatórios PDF por Músico")}
                   <div style={{ fontSize:"12px", color:"rgba(240,230,211,0.5)", marginBottom:"14px" }}>
                     Gere relatórios profissionais em PDF com calendário, estatísticas e detalhamento por domingo.
                   </div>
+
+                  {/* ── MONTH SELECTOR ── */}
+                  <div style={{ marginBottom:"16px" }}>
+                    <div style={{ fontSize:"9px", letterSpacing:"3px", color:"#c9a96e", textTransform:"uppercase", marginBottom:"8px" }}>
+                      Selecione os meses
+                    </div>
+                    <div style={{ display:"flex", flexWrap:"wrap", gap:"6px", marginBottom:"8px" }}>
+                      {allMonthKeys.map(mk => {
+                        const [y, m] = mk.split("-").map(Number);
+                        const isSelected = selectedMK.has(mk);
+                        return (
+                          <button key={mk} onClick={() => {
+                            const next = new Set(selectedMK);
+                            if (next.has(mk)) next.delete(mk); else next.add(mk);
+                            setReportSelectedMonths(next.size === allMonthKeys.length ? null : next.size > 0 ? next : new Set([mk]));
+                          }} style={{
+                            padding:"8px 14px", borderRadius:"8px", cursor:"pointer", fontSize:"12px", fontWeight:"600",
+                            fontFamily:"Georgia, serif", transition:"all 0.2s",
+                            background: isSelected ? "rgba(201,169,110,0.2)" : "rgba(255,255,255,0.03)",
+                            border: isSelected ? "1px solid rgba(201,169,110,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                            color: isSelected ? "#c9a96e" : "rgba(255,255,255,0.35)"
+                          }}>
+                            {MONTHS[m]} {y}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
+                      <button onClick={() => setReportSelectedMonths(null)} style={{
+                        padding:"4px 10px", borderRadius:"6px", border:"1px solid rgba(201,169,110,0.2)", background:"transparent",
+                        color:"#c9a96e", fontSize:"10px", cursor:"pointer", fontFamily:"Georgia, serif"
+                      }}>Todos</button>
+                      <div style={{ fontSize:"10px", color:"rgba(240,230,211,0.35)" }}>
+                        {selLabel} selecionado{selCount !== 1 ? "s" : ""}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── MUSICIAN GRID ── */}
                   <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(150px, 1fr))", gap:"8px", marginBottom:"16px" }}>
                     {musicians.filter(m => !m.manualOnly).map(m => {
                       const vc = getVocalistColor(m.id);
                       return (
-                        <button key={m.id} onClick={() => {
+                        <button key={m.id} disabled={!hasSelection} onClick={() => {
                           try {
-                            const doc = generateMusicianPDF(m, allSchedules, blockDates || {});
+                            const doc = generateMusicianPDF(m, filteredSchedules, blockDates || {});
                             if (doc) doc.save(`Relatorio_${m.short.replace(/\s+/g,"_")}.pdf`);
                           } catch(e) { console.error("PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
                         }} style={{
                           padding:"10px 12px", borderRadius:"10px", border:`1px solid ${vc.border}`, borderLeft:`3px solid ${vc.tag}`,
-                          background:"rgba(255,255,255,0.02)", cursor:"pointer", textAlign:"left", fontFamily:"Georgia, serif",
-                          transition:"all 0.2s"
+                          background:"rgba(255,255,255,0.02)", cursor: hasSelection ? "pointer" : "not-allowed", textAlign:"left",
+                          fontFamily:"Georgia, serif", transition:"all 0.2s", opacity: hasSelection ? 1 : 0.4
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                        onMouseEnter={e => { if (hasSelection) e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
                         onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.02)"; }}
                         >
                           <div style={{ fontSize:"13px", fontWeight:"700", color: vc.text, marginBottom:"4px" }}>{m.short}</div>
@@ -1786,23 +1834,25 @@ export default function EscalaMusicos() {
                       );
                     })}
                   </div>
-                  <button onClick={() => {
+                  <button disabled={!hasSelection} onClick={() => {
                     try {
-                      const doc = generateAllMusiciansPDF(musicians, allSchedules, blockDates || {});
+                      const doc = generateAllMusiciansPDF(musicians, filteredSchedules, blockDates || {});
                       if (doc) doc.save("Relatorio_Completo_Todos_Musicos.pdf");
                     } catch(e) { console.error("PDF error:", e); alert("Erro ao gerar PDF: " + e.message); }
                   }} style={{
-                    width:"100%", padding:"14px", borderRadius:"12px", border:"none", cursor:"pointer", fontSize:"14px", fontWeight:"700",
-                    fontFamily:"Georgia, serif", background:"linear-gradient(135deg,#c9a96e,#a07840)", color:"#0d0b1e",
-                    transition:"all 0.2s"
+                    width:"100%", padding:"14px", borderRadius:"12px", border:"none", cursor: hasSelection ? "pointer" : "not-allowed",
+                    fontSize:"14px", fontWeight:"700", fontFamily:"Georgia, serif",
+                    background: hasSelection ? "linear-gradient(135deg,#c9a96e,#a07840)" : "rgba(255,255,255,0.08)",
+                    color: hasSelection ? "#0d0b1e" : "rgba(255,255,255,0.3)", transition:"all 0.2s"
                   }}
-                  onMouseEnter={e => { e.currentTarget.style.opacity = "0.9"; }}
+                  onMouseEnter={e => { if (hasSelection) e.currentTarget.style.opacity = "0.9"; }}
                   onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
                   >
-                    {"\u{1F4E5}"} Baixar Relatório Completo (Todos os Músicos)
+                    {"\u{1F4E5}"} Baixar Relatório Completo ({selLabel})
                   </button>
                 </div>
-              )}
+                );
+              })()}
 
               {allMonthKeys.length === 0 && (
                 <div style={{ textAlign:"center", padding:"60px 20px", color:"rgba(240,230,211,0.3)", fontSize:"15px" }}>
