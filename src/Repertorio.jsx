@@ -719,24 +719,42 @@ export default function Repertorio() {
   }
 
   function getOutputText() {
-    let t = `🎵 *REPERTÓRIO DE LOUVOR*\n📍 Verbo Orlando — Winter Garden\n`;
+    const sep = "━━━━━━━━━━━━━━━━━━━━━";
+    let t = `🎵 *REPERTÓRIO DE LOUVOR* 🎵\n`;
+    t += `📍 *Verbo da Vida Music — Orlando, FL*\n`;
     if (meetDate) {
-      const tipo = meetType === "evento" ? (meetEventName ? `Evento: ${meetEventName}` : "Evento Especial") : "Culto de Domingo";
-      t += `📅 ${formatBrDate(meetDate)} · ${tipo}\n`;
+      const tipo = meetType === "evento"
+        ? (meetEventName ? `🎉 ${meetEventName}` : "🎉 Evento Especial")
+        : "⛪ Culto de Domingo";
+      t += `📅 ${formatBrDate(meetDate)}  ·  ${tipo}\n`;
     }
-    if (createdBy) t += `✍ Repertório por: ${createdBy}\n`;
-    t += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    if (createdBy) t += `✍ Repertório por: *${createdBy}*\n`;
+    t += `${sep}\n\n`;
+
     selected.forEach((s, i) => {
       const row = confirmRows.find(r => r.videoId === s.videoId);
       const lead = row && row.lead ? row.lead.trim() : "";
       const tom = row && row.tom ? row.tom.trim() : "";
-      t += `*${i+1}. ${s.musica}*${s.verbo ? " ⭐" : ""}\n🎤 ${s.artista}\n`;
-      if (lead) t += `🎙 Lead: ${lead}${tom ? ` · Tom: ${tom}` : ""}\n`;
-      else if (tom) t += `🎼 Tom: ${tom}\n`;
-      if (s.videoId) t += `🔗 https://youtu.be/${s.videoId}\n`;
+      const temas = getEffectiveTemas(s).map(tid => TEMAS_DEF[tid]?.label).filter(Boolean);
+
+      t += `*${i+1}. ${s.musica}*${s.verbo ? " ⭐" : ""}${isCelebracao(s) ? " 🎉" : ""}\n`;
+      t += `🎤 ${s.artista}\n`;
+      if (lead || tom) {
+        const parts = [];
+        if (lead) parts.push(`🎙 Lead: *${lead}*`);
+        if (tom) parts.push(`🎼 Tom: *${tom}*`);
+        t += parts.join("  ·  ") + "\n";
+      }
+      if (temas.length > 0) {
+        t += `💭 Temas: ${temas.join(" • ")}\n`;
+      }
+      if (s.videoId) t += `▶ https://youtu.be/${s.videoId}\n`;
       t += "\n";
     });
-    t += `━━━━━━━━━━━━━━━━━━━━━\n⭐ = Verbo da Vida`;
+
+    t += `${sep}\n`;
+    t += `⭐ Verbo da Vida   🎉 Celebração\n`;
+    t += `_Que o Senhor seja exaltado neste culto!_ 🙌`;
     return t;
   }
 
@@ -770,7 +788,7 @@ export default function Repertorio() {
 
       {/* HERO */}
       <div style={S.hero}>
-        <div style={S.eyebrow}>✦ Verbo Orlando · Winter Garden</div>
+        <div style={S.eyebrow}>✦ Verbo da Vida Music · Orlando, FL</div>
         <h1 style={S.h1}>Repertório de Louvor</h1>
         <p style={S.sub}>Escolha 4 músicas para o próximo culto. Pelo menos uma do Verbo da Vida.</p>
         <div style={S.stats}>

@@ -135,7 +135,7 @@ export default function SiteHeader({ current }) {
       <div style={H.bar}>
         <div style={H.brand}>
           <div style={H.brandDot}>♪</div>
-          <span>Verbo Orlando</span>
+          <span>Verbo da Vida Music — Orlando, FL</span>
         </div>
 
         <div style={H.nav}>
