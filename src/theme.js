@@ -47,6 +47,8 @@ const CSS = `
     --chip-bg: rgba(15,23,42,0.04);
     --chip-text: #475569;
     --input-bg: rgba(255,255,255,0.78);
+    --menu-bg: #ffffff;
+    --menu-hover: #f1f5f9;
   }
 
   :root[data-theme="dark"] {
@@ -73,6 +75,8 @@ const CSS = `
     --chip-bg: rgba(255,255,255,0.05);
     --chip-text: #cbd5e1;
     --input-bg: rgba(255,255,255,0.05);
+    --menu-bg: #131826;
+    --menu-hover: #1e2535;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }

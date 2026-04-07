@@ -47,9 +47,9 @@ const M = {
   picker: { position: "relative", flex: 1 },
   pickerBtn: { width: "100%", padding: "11px 14px", borderRadius: 12, border: "1px solid var(--border-strong)", background: "var(--input-bg)", color: "var(--text)", fontSize: "0.88rem", textAlign: "left", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", fontFamily: "inherit", boxSizing: "border-box" },
   pickerPlaceholder: { color: "var(--text-faint)" },
-  pickerMenu: { position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, maxHeight: 240, overflowY: "auto", background: "var(--surface-strong)", backdropFilter: "blur(18px) saturate(160%)", WebkitBackdropFilter: "blur(18px) saturate(160%)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "var(--shadow-md)", zIndex: 20 },
-  pickerItem: { padding: "11px 14px", cursor: "pointer", color: "var(--text)", fontSize: "0.85rem", borderBottom: "1px solid var(--border)" },
-  pickerItemClear: { padding: "10px 14px", cursor: "pointer", color: "var(--text-faint)", fontSize: "0.8rem", fontStyle: "italic", borderBottom: "1px solid var(--border)" },
+  pickerMenu: { position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, maxHeight: 240, overflowY: "auto", background: "var(--menu-bg)", border: "1px solid var(--border-strong)", borderRadius: 12, boxShadow: "var(--shadow-lg)", zIndex: 50 },
+  pickerItem: { padding: "11px 14px", cursor: "pointer", color: "var(--text)", fontSize: "0.85rem", borderBottom: "1px solid var(--border)", background: "var(--menu-bg)" },
+  pickerItemClear: { padding: "10px 14px", cursor: "pointer", color: "var(--text-faint)", fontSize: "0.8rem", fontStyle: "italic", borderBottom: "1px solid var(--border)", background: "var(--menu-bg)" },
   pickerEmpty: { padding: "14px", color: "var(--text-faint)", fontSize: "0.8rem", fontStyle: "italic", textAlign: "center" },
 
   // PessoasModal list
@@ -99,6 +99,7 @@ export function LoginModal({ open, onClose, onLogin }) {
 // it. Clicking outside closes the menu.
 export function PersonPicker({ value, pessoas, placeholder, onChange }) {
   const [open, setOpen] = useState(false);
+  const [hoverIdx, setHoverIdx] = useState(-1);
   const ref = useRef(null);
   useEffect(() => {
     function handler(e) {
@@ -118,7 +119,15 @@ export function PersonPicker({ value, pessoas, placeholder, onChange }) {
       </button>
       {open && (
         <div style={M.pickerMenu}>
-          <div style={M.pickerItemClear} onClick={() => { onChange(""); setOpen(false); }}>
+          <div
+            style={{
+              ...M.pickerItemClear,
+              background: hoverIdx === -2 ? "var(--menu-hover)" : "var(--menu-bg)",
+            }}
+            onMouseEnter={() => setHoverIdx(-2)}
+            onMouseLeave={() => setHoverIdx(-1)}
+            onClick={() => { onChange(""); setOpen(false); }}
+          >
             — Limpar seleção —
           </div>
           {list.length === 0 ? (
@@ -126,16 +135,26 @@ export function PersonPicker({ value, pessoas, placeholder, onChange }) {
               Nenhum cantor cadastrado.<br/>Adicione em ⚙ Cantores.
             </div>
           ) : (
-            list.map(p => (
-              <div key={p} style={{
-                ...M.pickerItem,
-                background: value === p ? "var(--accent-soft)" : undefined,
-                color: value === p ? "var(--accent-text)" : "var(--text)",
-                fontWeight: value === p ? 700 : 500,
-              }} onClick={() => { onChange(p); setOpen(false); }}>
-                {value === p ? "✓ " : ""}{p}
-              </div>
-            ))
+            list.map((p, i) => {
+              const isSel = value === p;
+              const isHover = hoverIdx === i;
+              return (
+                <div
+                  key={p}
+                  style={{
+                    ...M.pickerItem,
+                    background: isSel ? "var(--accent-soft)" : (isHover ? "var(--menu-hover)" : "var(--menu-bg)"),
+                    color: isSel ? "var(--accent-text)" : "var(--text)",
+                    fontWeight: isSel ? 700 : 500,
+                  }}
+                  onMouseEnter={() => setHoverIdx(i)}
+                  onMouseLeave={() => setHoverIdx(-1)}
+                  onClick={() => { onChange(p); setOpen(false); }}
+                >
+                  {isSel ? "✓ " : ""}{p}
+                </div>
+              );
+            })
           )}
         </div>
       )}
