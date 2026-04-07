@@ -307,6 +307,11 @@ export default function Repertorio() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [confirmRows, setConfirmRows] = useState([]); // [{ videoId, lead, tom }]
   const [savingConfirm, setSavingConfirm] = useState(false);
+  // Metadata for the repertorio (date, type, creator) — also persisted to history
+  const [meetDate, setMeetDate] = useState("");
+  const [meetType, setMeetType] = useState("domingo"); // 'domingo' | 'evento'
+  const [meetEventName, setMeetEventName] = useState("");
+  const [createdBy, setCreatedBy] = useState("");
 
   // ── Admin / overrides state ──
   const [admin, setAdmin] = useState(checkIsAdmin());
@@ -614,34 +619,90 @@ export default function Repertorio() {
       return { videoId: s.videoId, lead, tom };
     });
     setConfirmRows(rows);
+    // Default the meeting date to the next upcoming Sunday (YYYY-MM-DD)
+    if (!meetDate) {
+      const today = new Date();
+      const dow = today.getDay(); // 0 = Sunday
+      const add = dow === 0 ? 7 : (7 - dow);
+      const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() + add);
+      const iso = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+      setMeetDate(iso);
+    }
     setShowConfirm(true);
   }
 
-  // Persist the chosen lead/tom into song_keys (per-singer history) and open
-  // the WhatsApp output modal. Tom can be left blank — only saves when filled.
+  // Persist the chosen lead/tom into song_keys (per-singer history),
+  // append a history entry for the whole repertorio, then open the
+  // WhatsApp output modal. Tom can be left blank — only saves when filled.
   async function confirmAndShow() {
+    // Validation: creator name is required
+    if (!createdBy.trim()) {
+      alert("Por favor, informe quem está criando o repertório.");
+      return;
+    }
+    if (!meetDate) {
+      alert("Por favor, selecione a data do culto.");
+      return;
+    }
+    if (meetType === "evento" && !meetEventName.trim()) {
+      alert("Por favor, informe o nome do evento.");
+      return;
+    }
     setSavingConfirm(true);
     try {
+      // 1) Update per-singer key history (only when both lead and tom present)
       const nextKeys = { ...songKeys };
       confirmRows.forEach(row => {
         const lead = (row.lead || "").trim();
         const tom = (row.tom || "").trim();
-        if (!lead || !tom) return; // nothing to persist for this song
+        if (!lead || !tom) return;
         const arr = Array.isArray(nextKeys[row.videoId]) ? [...nextKeys[row.videoId]] : [];
         const idx = arr.findIndex(k => (k.cantor || "").trim() === lead);
         if (idx >= 0) arr[idx] = { cantor: lead, tom };
         else arr.push({ cantor: lead, tom });
         nextKeys[row.videoId] = arr;
       });
-      // Only hit the API if anything actually changed
-      if (JSON.stringify(nextKeys) !== JSON.stringify(songKeys)) {
-        await apiPut("song_keys", nextKeys);
-        setSongKeys(nextKeys);
-      }
+      const keysChanged = JSON.stringify(nextKeys) !== JSON.stringify(songKeys);
+
+      // 2) Build the history entry for this repertorio
+      const entry = {
+        id: `rep_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+        createdAt: new Date().toISOString(),
+        createdBy: createdBy.trim(),
+        date: meetDate,
+        type: meetType, // 'domingo' | 'evento'
+        eventName: meetType === "evento" ? meetEventName.trim() : "",
+        songs: selected.map((s, i) => {
+          const row = confirmRows[i] || {};
+          return {
+            videoId: s.videoId,
+            musica: s.musica,
+            artista: s.artista,
+            verbo: !!s.verbo,
+            lead: (row.lead || "").trim(),
+            tom: (row.tom || "").trim(),
+          };
+        }),
+      };
+
+      // 3) Load current history, append, persist
+      let history = [];
+      try {
+        const cur = await apiGet("repertorio_history");
+        if (Array.isArray(cur)) history = cur;
+      } catch {}
+      const nextHistory = [entry, ...history];
+
+      // 4) Save in parallel
+      const ops = [apiPut("repertorio_history", nextHistory)];
+      if (keysChanged) ops.push(apiPut("song_keys", nextKeys));
+      await Promise.all(ops);
+      if (keysChanged) setSongKeys(nextKeys);
+
       setShowConfirm(false);
       setShowOutput(true);
     } catch (e) {
-      console.error("Failed to save song_keys", e);
+      console.error("Failed to save repertorio", e);
       // Still show the output even if persistence fails
       setShowConfirm(false);
       setShowOutput(true);
@@ -650,8 +711,21 @@ export default function Repertorio() {
     }
   }
 
+  function formatBrDate(iso) {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-");
+    if (!y || !m || !d) return iso;
+    return `${d}/${m}/${y}`;
+  }
+
   function getOutputText() {
-    let t = `🎵 *REPERTÓRIO DE LOUVOR*\n📍 Verbo Orlando — Winter Garden\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
+    let t = `🎵 *REPERTÓRIO DE LOUVOR*\n📍 Verbo Orlando — Winter Garden\n`;
+    if (meetDate) {
+      const tipo = meetType === "evento" ? (meetEventName ? `Evento: ${meetEventName}` : "Evento Especial") : "Culto de Domingo";
+      t += `📅 ${formatBrDate(meetDate)} · ${tipo}\n`;
+    }
+    if (createdBy) t += `✍ Repertório por: ${createdBy}\n`;
+    t += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
     selected.forEach((s, i) => {
       const row = confirmRows.find(r => r.videoId === s.videoId);
       const lead = row && row.lead ? row.lead.trim() : "";
@@ -985,12 +1059,126 @@ export default function Repertorio() {
           <div className="v-scale" style={{ width: "100%", maxWidth: 560 }}>
             <div style={S.modal}>
               <div style={{ padding: 24 }}>
-                <div style={S.outputTitle}>🎙 Confirmar Lead e Tom</div>
+                <div style={S.outputTitle}>🎙 Confirmar Repertório</div>
                 <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", textAlign: "center", marginBottom: 18 }}>
-                  Para cada música, escolha quem vai cantar (Lead) e o tom. O tom pode ficar em branco se ainda não souber.
+                  Preencha os dados do culto e, para cada música, escolha o Lead e o tom (pode ficar em branco se ainda não souber).
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
+                {/* ── Metadata: data, tipo, criador ── */}
+                <div style={{
+                  background: "var(--accent-soft)",
+                  border: "1px solid var(--accent-border)",
+                  borderRadius: 14,
+                  padding: 14,
+                  marginBottom: 14,
+                }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                        Data do culto
+                      </div>
+                      <input
+                        type="date"
+                        value={meetDate}
+                        onChange={e => setMeetDate(e.target.value)}
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          background: "var(--input-bg)",
+                          border: "1px solid var(--border-strong)",
+                          borderRadius: 10,
+                          color: "var(--text)",
+                          fontSize: "0.86rem",
+                          outline: "none",
+                          fontFamily: "inherit",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                        Tipo
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <button
+                          type="button"
+                          onClick={() => setMeetType("domingo")}
+                          style={{
+                            flex: 1,
+                            padding: "10px 8px",
+                            borderRadius: 10,
+                            border: meetType === "domingo" ? "1px solid var(--accent)" : "1px solid var(--border-strong)",
+                            background: meetType === "domingo" ? "var(--accent-soft)" : "var(--input-bg)",
+                            color: meetType === "domingo" ? "var(--accent-text)" : "var(--text-muted)",
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Domingo
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMeetType("evento")}
+                          style={{
+                            flex: 1,
+                            padding: "10px 8px",
+                            borderRadius: 10,
+                            border: meetType === "evento" ? "1px solid var(--accent)" : "1px solid var(--border-strong)",
+                            background: meetType === "evento" ? "var(--accent-soft)" : "var(--input-bg)",
+                            color: meetType === "evento" ? "var(--accent-text)" : "var(--text-muted)",
+                            fontSize: "0.78rem",
+                            fontWeight: 700,
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                          }}
+                        >
+                          Evento
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {meetType === "evento" && (
+                    <div style={{ marginTop: 10 }}>
+                      <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                        Nome do evento
+                      </div>
+                      <input
+                        value={meetEventName}
+                        onChange={e => setMeetEventName(e.target.value)}
+                        placeholder="Ex: Vigília de Ano Novo"
+                        style={{
+                          width: "100%",
+                          padding: "10px 12px",
+                          background: "var(--input-bg)",
+                          border: "1px solid var(--border-strong)",
+                          borderRadius: 10,
+                          color: "var(--text)",
+                          fontSize: "0.86rem",
+                          outline: "none",
+                          fontFamily: "inherit",
+                          boxSizing: "border-box",
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                      Criado por
+                    </div>
+                    <PersonPicker
+                      value={createdBy}
+                      pessoas={pessoas}
+                      placeholder="Quem está criando este repertório?"
+                      onChange={setCreatedBy}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "45vh", overflowY: "auto", paddingRight: 4 }}>
                   {selected.map((s, i) => {
                     const row = confirmRows[i] || { videoId: s.videoId, lead: "", tom: "" };
                     const update = (patch) => {
