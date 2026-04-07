@@ -167,16 +167,24 @@ export function PersonPicker({ value, pessoas, placeholder, onChange }) {
 // edit (inline rename), and remove. Emits the new list + a renames map so
 // the parent can cascade renames through overrides and song keys.
 export function PessoasModal({ open, pessoas: initial, onSave, onClose }) {
-  const [list, setList] = useState(initial || []);
-  const [original, setOriginal] = useState(initial || []);
+  // Each row carries a STABLE id and remembers the name it originally had
+  // (or null if it was newly added in this session). Rename detection compares
+  // each row's current value to its OWN original — never positional. This
+  // prevents the corruption bug where removing one row caused every row below
+  // to be misinterpreted as a rename of the row above it.
+  const [rows, setRows] = useState([]);
   const [novo, setNovo] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     if (open) {
-      setList(initial || []);
-      setOriginal(initial || []);
+      const init = (initial || []).map((name, i) => ({
+        rowId: `o${i}-${name}`,
+        original: name,
+        current: name,
+      }));
+      setRows(init);
       setNovo("");
       setErr("");
     }
@@ -187,31 +195,45 @@ export function PessoasModal({ open, pessoas: initial, onSave, onClose }) {
   function add() {
     const n = novo.trim();
     if (!n) return;
-    if (list.includes(n)) { setNovo(""); return; }
-    setList(prev => [...prev, n]);
+    if (rows.some(r => (r.current || "").trim() === n)) { setNovo(""); return; }
+    setRows(prev => [...prev, {
+      rowId: `n${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      original: null,
+      current: n,
+    }]);
     setNovo("");
   }
-  function remove(i) { setList(prev => prev.filter((_, idx) => idx !== i)); }
-  function update(i, val) {
-    setList(prev => prev.map((p, idx) => idx === i ? val : p));
+  function remove(rowId) { setRows(prev => prev.filter(r => r.rowId !== rowId)); }
+  function update(rowId, val) {
+    setRows(prev => prev.map(r => r.rowId === rowId ? { ...r, current: val } : r));
   }
 
   async function save() {
     setErr(""); setSaving(true);
     try {
-      const cleaned = list.map(p => (p || "").trim()).filter(Boolean);
+      // Trim + drop empties, but keep row identity to allow correct rename detection.
+      const cleaned = rows
+        .map(r => ({ ...r, current: (r.current || "").trim() }))
+        .filter(r => r.current);
+
+      // Dedupe by current name preserving first occurrence (and its row identity).
+      const seen = new Set();
       const dedup = [];
-      cleaned.forEach(p => { if (!dedup.includes(p)) dedup.push(p); });
-      // Rename detection: compare by index with the snapshot taken at open.
+      cleaned.forEach(r => {
+        if (!seen.has(r.current)) { seen.add(r.current); dedup.push(r); }
+      });
+
+      // Rename detection: ONLY rows that survived AND whose current name differs
+      // from their own original name count as a rename. Removed rows do NOT.
       const renames = {};
-      original.forEach((oldName, i) => {
-        const newName = (list[i] || "").trim();
-        const oldTrim = (oldName || "").trim();
-        if (oldTrim && newName && oldTrim !== newName) {
-          renames[oldTrim] = newName;
+      dedup.forEach(r => {
+        if (r.original && r.original !== r.current) {
+          renames[r.original] = r.current;
         }
       });
-      await onSave(dedup, renames);
+
+      const finalList = dedup.map(r => r.current);
+      await onSave(finalList, renames);
       onClose();
     } catch (ex) {
       setErr(ex.message === "unauthorized" ? "Sessão expirou. Faça login novamente." : "Erro ao salvar: " + ex.message);
@@ -229,17 +251,17 @@ export function PessoasModal({ open, pessoas: initial, onSave, onClose }) {
           nome antigo.
         </div>
 
-        <div style={M.label}>Lista ({list.length})</div>
+        <div style={M.label}>Lista ({rows.length})</div>
         <div>
-          {list.map((p, i) => (
-            <div key={i} style={M.pessoaListRow}>
+          {rows.map((r) => (
+            <div key={r.rowId} style={M.pessoaListRow}>
               <input
                 style={M.pessoaInput}
-                value={p}
-                onChange={e => update(i, e.target.value)}
+                value={r.current}
+                onChange={e => update(r.rowId, e.target.value)}
                 placeholder="Nome do cantor / músico"
               />
-              <button type="button" style={M.rowDel} onClick={() => remove(i)} title="Remover">✕</button>
+              <button type="button" style={M.rowDel} onClick={() => remove(r.rowId)} title="Remover">✕</button>
             </div>
           ))}
           <div style={M.pessoaListRow}>

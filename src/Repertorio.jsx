@@ -572,41 +572,63 @@ export default function Repertorio() {
       return renameMap[t] || t;
     };
 
-    const nextOv = {};
-    Object.entries(overrides).forEach(([k, ov]) => {
-      if (!ov) return;
-      const newOv = { ...ov };
-      if (newOv.indicadaPor !== undefined) newOv.indicadaPor = mapName(newOv.indicadaPor);
-      nextOv[k] = newOv;
-    });
-    // Force override for any base song whose indicadaPor was renamed.
-    if (hasRenames) {
-      SONGS.forEach(s => {
-        const baseName = (s.indicadaPor || "").trim();
-        if (renameMap[baseName]) {
-          const cur = nextOv[s.videoId] ? { ...nextOv[s.videoId] } : {};
-          cur.indicadaPor = renameMap[baseName];
-          nextOv[s.videoId] = cur;
-        }
-      });
-    }
-
-    const nextKeys = {};
-    Object.entries(songKeys).forEach(([k, arr]) => {
-      if (!Array.isArray(arr)) return;
-      nextKeys[k] = arr.map(row => ({ ...row, cantor: mapName(row.cantor) }));
-    });
-
     setSavingFlash(true);
     try {
-      await Promise.all([
-        apiPut("pessoas_repertorio", nextPessoas),
-        apiPut("repertorio_overrides", nextOv),
-        apiPut("song_keys", nextKeys),
-      ]);
+      // Always persist the singer list. Only touch overrides / song_keys /
+      // custom_songs when there are actual renames — this prevents any
+      // accidental re-save from corrupting unrelated data.
+      const ops = [apiPut("pessoas_repertorio", nextPessoas)];
+
+      let nextOv = overrides;
+      let nextKeys = songKeys;
+      let nextCustom = customSongs;
+
+      if (hasRenames) {
+        nextOv = {};
+        Object.entries(overrides).forEach(([k, ov]) => {
+          if (!ov) return;
+          const newOv = { ...ov };
+          if (newOv.indicadaPor !== undefined && renameMap[(newOv.indicadaPor || "").trim()]) {
+            newOv.indicadaPor = mapName(newOv.indicadaPor);
+          }
+          nextOv[k] = newOv;
+        });
+        // Force override for any base song whose indicadaPor was renamed.
+        SONGS.forEach(s => {
+          const baseName = (s.indicadaPor || "").trim();
+          if (renameMap[baseName]) {
+            const cur = nextOv[s.videoId] ? { ...nextOv[s.videoId] } : {};
+            cur.indicadaPor = renameMap[baseName];
+            nextOv[s.videoId] = cur;
+          }
+        });
+
+        nextKeys = {};
+        Object.entries(songKeys).forEach(([k, arr]) => {
+          if (!Array.isArray(arr)) return;
+          nextKeys[k] = arr.map(row => ({ ...row, cantor: mapName(row.cantor) }));
+        });
+
+        // Custom songs carry their own indicadaPor field (no override needed)
+        // — rename in place so they stay consistent.
+        nextCustom = customSongs.map(c => {
+          const cur = (c.indicadaPor || "").trim();
+          if (cur && renameMap[cur]) return { ...c, indicadaPor: renameMap[cur] };
+          return c;
+        });
+
+        ops.push(apiPut("repertorio_overrides", nextOv));
+        ops.push(apiPut("song_keys", nextKeys));
+        ops.push(apiPut("repertorio_custom_songs", nextCustom));
+      }
+
+      await Promise.all(ops);
       setPessoas(nextPessoas);
-      setOverrides(nextOv);
-      setSongKeys(nextKeys);
+      if (hasRenames) {
+        setOverrides(nextOv);
+        setSongKeys(nextKeys);
+        setCustomSongs(nextCustom);
+      }
       if (detail) {
         const raw = findRawSong(detail.videoId);
         if (raw) setDetail(getEffectiveSong(raw));
