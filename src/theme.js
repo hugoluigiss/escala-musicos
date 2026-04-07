@@ -80,7 +80,7 @@ const CSS = `
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body, #root { min-height: 100%; }
+  html, body, #root { min-height: 100%; max-width: 100vw; overflow-x: hidden; }
   body {
     background: var(--bg-base);
     background-image: var(--bg-grad);
@@ -113,6 +113,32 @@ const CSS = `
     -webkit-backdrop-filter: blur(var(--blur)) saturate(160%);
     border: 1px solid var(--border-strong);
     box-shadow: var(--shadow-lg);
+  }
+
+  /* Mobile responsive helpers */
+  .brand-full { display: inline; }
+  .brand-short { display: none; }
+  @media (max-width: 640px) {
+    .brand-full { display: none; }
+    .brand-short { display: inline; }
+    .hero-pad { padding: 22px 14px 6px !important; }
+    .container-pad { padding: 14px 12px 0 !important; }
+    .bar-pad { padding: 10px 12px !important; gap: 8px !important; }
+    .nav-compact { padding: 3px !important; }
+    .nav-compact button { padding: 6px 10px !important; font-size: 0.74rem !important; }
+    .icon-btn-sm { width: 32px !important; height: 32px !important; }
+    .admin-btn-sm { padding: 6px 10px !important; font-size: 0.72rem !important; }
+    .song-card { gap: 10px !important; padding: 10px !important; }
+    .song-thumb { width: 64px !important; height: 48px !important; }
+    .song-title { font-size: 0.88rem !important; }
+    .song-artist { font-size: 0.74rem !important; }
+    .bottom-dock { padding: 10px 12px 14px !important; }
+    .slot { padding: 7px 6px !important; min-height: 54px !important; }
+    .slot-name { font-size: 0.68rem !important; }
+  }
+  @media (max-width: 380px) {
+    .nav-compact button { padding: 5px 8px !important; font-size: 0.7rem !important; }
+    .brand-short { font-size: 0.78rem !important; }
   }
 
   /* Smooth fade for modal */

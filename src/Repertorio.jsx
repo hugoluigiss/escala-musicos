@@ -116,6 +116,24 @@ const S = {
   eyebrow: { display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "var(--accent-soft)", border: "1px solid var(--accent-border)", color: "var(--accent-text)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 },
   h1: { fontSize: "clamp(1.7rem, 5vw, 2.4rem)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: 8 },
   sub: { color: "var(--text-muted)", fontSize: "0.95rem", maxWidth: 480, margin: "0 auto" },
+  visionCard: {
+    maxWidth: 560, margin: "16px auto 0",
+    padding: "14px 18px", borderRadius: 16,
+    background: "var(--verbo-soft)",
+    border: "1px solid var(--verbo-border)",
+    backdropFilter: "blur(var(--blur))",
+    WebkitBackdropFilter: "blur(var(--blur))",
+    textAlign: "left",
+  },
+  visionTitle: {
+    fontSize: "0.72rem", fontWeight: 800, letterSpacing: "0.08em",
+    textTransform: "uppercase", color: "var(--verbo-text)",
+    marginBottom: 6,
+  },
+  visionText: {
+    fontSize: "0.86rem", lineHeight: 1.5, color: "var(--text)",
+    margin: 0,
+  },
   stats: { display: "flex", gap: 10, justifyContent: "center", marginTop: 18, flexWrap: "wrap" },
   stat: { padding: "8px 16px", borderRadius: 999, fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 600, background: "var(--surface)", border: "1px solid var(--border)", backdropFilter: "blur(var(--blur))", WebkitBackdropFilter: "blur(var(--blur))" },
   statVerbo: { background: "var(--verbo-soft)", border: "1px solid var(--verbo-border)", color: "var(--verbo-text)" },
@@ -825,10 +843,17 @@ export default function Repertorio() {
       <SiteHeader current="repertorio" />
 
       {/* HERO */}
-      <div style={S.hero}>
+      <div style={S.hero} className="hero-pad">
         <div style={S.eyebrow}>✦ Verbo da Vida Music · Orlando, FL</div>
         <h1 style={S.h1}>Repertório de Louvor</h1>
-        <p style={S.sub}>Escolha 4 músicas para o próximo culto. Pelo menos uma do Verbo da Vida.</p>
+        <p style={S.sub}>Escolha <b>4 músicas</b> para o próximo culto.</p>
+        <div style={S.visionCard} className="vision-card">
+          <div style={S.visionTitle}>⭐ Nossa Visão</div>
+          <p style={S.visionText}>
+            Somos chamados a <b>cantar a Palavra da Fé</b>. Por isso valorizamos os ministros que carregam a nossa visão —
+            <b> ao menos uma música do Verbo da Vida</b> deve estar presente em cada repertório.
+          </p>
+        </div>
         <div style={S.stats}>
           <span style={S.stat}><b>{SONGS.length}</b> &nbsp;músicas</span>
           <span style={{...S.stat,...S.statVerbo}}>⭐ <b>{SONGS.filter(s=>s.verbo).length}</b> &nbsp;Verbo da Vida</span>
@@ -867,7 +892,7 @@ export default function Repertorio() {
       </div>
 
       {/* CONTENT */}
-      <div style={S.container}>
+      <div style={S.container} className="container-pad">
         {/* Toolbar (search + filters) */}
         <div className="glass" style={S.toolbar}>
           <div style={S.searchBox}>
@@ -914,11 +939,11 @@ export default function Repertorio() {
             };
             const checkStyle = { ...S.check, ...(isSel ? S.checkSel : {}) };
             return (
-              <div key={s.num} style={cardStyle} onClick={() => setDetail(s)}>
-                {t ? <img src={t} style={S.thumb} loading="lazy" alt="" /> : <div style={S.thumb} />}
+              <div key={s.num} style={cardStyle} className="song-card" onClick={() => setDetail(s)}>
+                {t ? <img src={t} style={S.thumb} className="song-thumb" loading="lazy" alt="" /> : <div style={S.thumb} className="song-thumb" />}
                 <div style={S.info}>
-                  <div style={S.title}>{s.musica}</div>
-                  <div style={S.artist}>{s.artista}</div>
+                  <div style={S.title} className="song-title">{s.musica}</div>
+                  <div style={S.artist} className="song-artist">{s.artista}</div>
                   {s.indicadaPor && (
                     <div style={S.indicadaLine}>
                       <span style={S.indicadaLabel}>Indicado por:</span> {s.indicadaPor}
@@ -959,7 +984,7 @@ export default function Repertorio() {
       </div>
 
       {/* BOTTOM DOCK */}
-      <div style={S.bottom}>
+      <div style={S.bottom} className="bottom-dock">
         <div style={S.bottomContent}>
           <div style={S.repHeader}>
             <span style={S.repTitle}>♪ Meu Repertório</span>
@@ -978,10 +1003,10 @@ export default function Repertorio() {
               };
               return (
                 <div key={i} style={S.slotWrap}>
-                  <div style={slotStyle}>
+                  <div style={slotStyle} className="slot">
                     <div style={numStyle}>#{i+1}{s?.verbo ? " ⭐" : ""}</div>
-                    {s ? <div style={S.slotName}>{s.musica}</div>
-                       : <div style={S.slotEmpty}>{slotMsgs[i]}</div>}
+                    {s ? <div style={S.slotName} className="slot-name">{s.musica}</div>
+                       : <div style={S.slotEmpty} className="slot-name">{slotMsgs[i]}</div>}
                   </div>
                   {s && <button style={S.slotRemove} onClick={() => remove(s.num)} title="Remover">✕</button>}
                 </div>

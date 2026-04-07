@@ -28,7 +28,12 @@ const H = {
   brand: {
     display: "flex", alignItems: "center", gap: 8,
     fontSize: "0.88rem", fontWeight: 800, letterSpacing: "0.02em",
-    color: "var(--text)", whiteSpace: "nowrap",
+    color: "var(--text)",
+    minWidth: 0, flex: "1 1 auto", overflow: "hidden",
+  },
+  brandText: {
+    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+    minWidth: 0,
   },
   brandDot: {
     width: 28, height: 28, borderRadius: 9,
@@ -132,13 +137,16 @@ export default function SiteHeader({ current }) {
 
   return (
     <>
-      <div style={H.bar}>
+      <div style={H.bar} className="bar-pad">
         <div style={H.brand}>
           <div style={H.brandDot}>♪</div>
-          <span>Verbo da Vida Music — Orlando, FL</span>
+          <span style={H.brandText}>
+            <span className="brand-full">Verbo da Vida Music — Orlando, FL</span>
+            <span className="brand-short">Verbo Music</span>
+          </span>
         </div>
 
-        <div style={H.nav}>
+        <div style={H.nav} className="nav-compact">
           <button type="button" onClick={goRepertorio}
             style={{ ...H.btn, ...(current === "repertorio" ? H.btnActive : {}) }}>
             Repertório
@@ -155,14 +163,15 @@ export default function SiteHeader({ current }) {
             type="button"
             onClick={() => { toggleTheme(); setThemeState(getTheme()); }}
             style={H.iconBtn}
+            className="icon-btn-sm"
             title={theme === "light" ? "Mudar para escuro" : "Mudar para claro"}
             aria-label="Alternar tema"
           >
             {theme === "light" ? "🌙" : "☀️"}
           </button>
           {admin
-            ? <button type="button" style={H.adminOn} onClick={handleLogout} title="Sair do modo admin">✓ Admin</button>
-            : <button type="button" style={H.adminBtn} onClick={openLogin}>🔐 Admin</button>
+            ? <button type="button" style={H.adminOn} className="admin-btn-sm" onClick={handleLogout} title="Sair do modo admin">✓ Admin</button>
+            : <button type="button" style={H.adminBtn} className="admin-btn-sm" onClick={openLogin}>🔐 Admin</button>
           }
         </div>
       </div>
