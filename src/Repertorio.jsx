@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { LETRAS } from "./letras.js";
 import { TEMAS, TEMAS_DEF } from "./temas.js";
-import { apiGet, apiPut, adminLogin, isAdmin as checkIsAdmin, clearAdminPassword } from "./api.js";
-import { LoginModal, EditSongModal } from "./AdminEdit.jsx";
+import { apiGet, apiPut, isAdmin as checkIsAdmin } from "./api.js";
+import { EditSongModal } from "./AdminEdit.jsx";
+import SiteHeader from "./SiteHeader.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
 const SONGS=[
@@ -180,7 +181,6 @@ export default function Repertorio() {
 
   // ── Admin / overrides state ──
   const [admin, setAdmin] = useState(checkIsAdmin());
-  const [showLogin, setShowLogin] = useState(false);
   const [editing, setEditing] = useState(null); // song being edited
   const [overrides, setOverrides] = useState({});  // { videoId: { indicadaPor, tom } }
   const [temasOver, setTemasOver] = useState({});  // { videoId: [tagId, ...] }
@@ -237,15 +237,17 @@ export default function Repertorio() {
   const hasVerbo = selected.some(s => s.verbo);
   const canGenerate = selected.length === 4 && hasVerbo;
 
-  // ── Admin actions ──
-  async function handleLogin(pw) {
-    await adminLogin(pw);
-    setAdmin(true);
-  }
-  function handleLogout() {
-    clearAdminPassword();
-    setAdmin(false);
-  }
+  // ── Sync admin state with global login events from SiteHeader ──
+  useEffect(() => {
+    const sync = () => setAdmin(checkIsAdmin());
+    window.addEventListener("admin-changed", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("admin-changed", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
   async function handleSaveEdit(payload) {
     const { temas: newTemas, override, keys, pessoas: newPessoas } = payload;
     const vid = editing.videoId;
@@ -345,6 +347,7 @@ export default function Repertorio() {
 
   return (
     <div style={S.page}>
+      <SiteHeader current="repertorio" />
       {/* HEADER */}
       <div style={S.header}>
         <h1 style={S.h1}>Repertório de Louvor</h1>
@@ -352,14 +355,7 @@ export default function Repertorio() {
         <div style={S.stats}>
           <span style={S.stat}><b>{SONGS.length}</b> músicas</span>
           <span style={{...S.stat,...S.statVerbo}}><b>{SONGS.filter(s=>s.verbo).length}</b> Verbo da Vida</span>
-        </div>
-        <div style={S.nav}>
-          <a href="/escala" style={S.navBtn}>📅 Escala</a>
-          <span style={{...S.navBtn, background:"rgba(201,169,110,0.2)", borderColor:"rgba(201,169,110,0.4)"}}>🎵 Repertório</span>
-          {admin
-            ? <button style={S.adminOnBtn} onClick={handleLogout} title="Sair do modo admin">✓ Admin{savingFlash ? " ⏳" : ""}</button>
-            : <button style={S.adminBtn} onClick={() => setShowLogin(true)}>🔐 Admin</button>
-          }
+          {admin && <span style={{...S.stat, ...S.statVerbo}}>✓ Admin{savingFlash ? " ⏳" : ""}</span>}
         </div>
       </div>
 
@@ -518,9 +514,6 @@ export default function Repertorio() {
           </div>
         </div>
       )}
-
-      {/* LOGIN MODAL */}
-      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} onLogin={handleLogin} />
 
       {/* EDIT MODAL */}
       {editing && (

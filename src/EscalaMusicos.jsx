@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { generateMusicianPDF, generateAllMusiciansPDF, generateCalendarPDF } from "./pdfReport.js";
+import SiteHeader from "./SiteHeader.jsx";
 // ─── DEFAULT DATA ────────────────────────────────────────────────────────────
 const DEFAULT_MUSICIANS = [
   { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
@@ -872,6 +873,7 @@ export default function EscalaMusicos() {
 
   return (
     <div style={{ fontFamily:"'Georgia', serif", minHeight:"100vh", background:"#0d0b1e", color:"#f0e6d3" }}>
+      <SiteHeader current="escala" />
       <div style={{ position:"fixed", inset:0, backgroundImage:"radial-gradient(ellipse at 20% 20%, rgba(201,169,110,0.08) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(100,80,180,0.1) 0%, transparent 60%)", pointerEvents:"none" }} />
       <div style={{ position:"relative", maxWidth:"1100px", margin:"0 auto", padding:"24px 16px" }}>
         {/* ── HEADER ── */}
