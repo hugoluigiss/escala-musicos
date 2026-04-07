@@ -221,6 +221,9 @@ export default function Repertorio() {
     if (!ov) return s;
     return {
       ...s,
+      musica: ov.musica !== undefined && ov.musica !== "" ? ov.musica : s.musica,
+      artista: ov.artista !== undefined && ov.artista !== "" ? ov.artista : s.artista,
+      verbo: typeof ov.verbo === "boolean" ? ov.verbo : s.verbo,
       indicadaPor: ov.indicadaPor !== undefined && ov.indicadaPor !== "" ? ov.indicadaPor : s.indicadaPor,
       tom: ov.tom !== undefined && ov.tom !== "" ? ov.tom : s.tom,
     };
@@ -251,12 +254,23 @@ export default function Repertorio() {
   async function handleSaveEdit(payload) {
     const { temas: newTemas, override, keys, pessoas: newPessoas } = payload;
     const vid = editing.videoId;
-    // Build next maps
+    const baseSong = SONGS.find(s => s.videoId === vid) || editing;
+    // Build next maps — só guarda no override o que for diferente do base
     const nextOv = { ...overrides };
-    if ((override.indicadaPor || "").trim() === "" && (override.tom || "").trim() === "") {
+    const trimmedMusica = (override.musica || "").trim();
+    const trimmedArtista = (override.artista || "").trim();
+    const trimmedIndicada = (override.indicadaPor || "").trim();
+    const trimmedTom = (override.tom || "").trim();
+    const cleanOv = {};
+    if (trimmedMusica && trimmedMusica !== baseSong.musica) cleanOv.musica = trimmedMusica;
+    if (trimmedArtista && trimmedArtista !== baseSong.artista) cleanOv.artista = trimmedArtista;
+    if (!!override.verbo !== !!baseSong.verbo) cleanOv.verbo = !!override.verbo;
+    if (trimmedIndicada !== (baseSong.indicadaPor || "")) cleanOv.indicadaPor = trimmedIndicada;
+    if (trimmedTom !== (baseSong.tom || "")) cleanOv.tom = trimmedTom;
+    if (Object.keys(cleanOv).length === 0) {
       delete nextOv[vid];
     } else {
-      nextOv[vid] = { indicadaPor: override.indicadaPor, tom: override.tom };
+      nextOv[vid] = cleanOv;
     }
     const nextTemas = { ...temasOver };
     if (Array.isArray(newTemas) && newTemas.length > 0) nextTemas[vid] = newTemas;

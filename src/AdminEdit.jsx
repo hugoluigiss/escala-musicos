@@ -76,11 +76,19 @@ export function LoginModal({ open, onClose, onLogin }) {
 }
 
 // ─── Edit Modal ────────────────────────────────────────────────────────────
-// props: song, currentTemas (array), currentOverride ({indicadaPor, tom}),
+// props: song, currentTemas (array),
+//        currentOverride ({musica, artista, verbo, indicadaPor, tom}),
 //        currentKeys (array of {cantor, tom}), pessoas (array of strings),
 //        onSave({temas, override, keys, pessoas}), onClose
 export function EditSongModal({ song, currentTemas, currentOverride, currentKeys, pessoas: initialPessoas, onSave, onClose }) {
   const [temas, setTemas] = useState(currentTemas || []);
+  const [musica, setMusica] = useState((currentOverride?.musica) ?? song.musica ?? "");
+  const [artista, setArtista] = useState((currentOverride?.artista) ?? song.artista ?? "");
+  const [verbo, setVerbo] = useState(
+    currentOverride && typeof currentOverride.verbo === "boolean"
+      ? currentOverride.verbo
+      : !!song.verbo
+  );
   const [indicadaPor, setIndicadaPor] = useState((currentOverride?.indicadaPor) ?? song.indicadaPor ?? "");
   const [tom, setTom] = useState((currentOverride?.tom) ?? song.tom ?? "");
   const [keys, setKeys] = useState(currentKeys || []);
@@ -122,7 +130,13 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
       const cleanKeys = keys.filter(k => (k.cantor || "").trim() || (k.tom || "").trim());
       await onSave({
         temas,
-        override: { indicadaPor: indicadaPor.trim(), tom: tom.trim() },
+        override: {
+          musica: musica.trim(),
+          artista: artista.trim(),
+          verbo: !!verbo,
+          indicadaPor: indicadaPor.trim(),
+          tom: tom.trim(),
+        },
         keys: cleanKeys,
         pessoas,
       });
@@ -137,6 +151,19 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
       <div style={M.modal}>
         <div style={M.title}>✏️ Editar música</div>
         <div style={M.sub}>{song.musica} — <span style={{color:"#a99bff"}}>{song.artista}</span></div>
+
+        <div style={M.label}>Nome da música</div>
+        <input style={M.input} value={musica} onChange={e => setMusica(e.target.value)} placeholder="Título da música" />
+
+        <div style={M.label}>Artista</div>
+        <input style={M.input} value={artista} onChange={e => setArtista(e.target.value)} placeholder="Nome do artista / banda" />
+
+        <div style={M.label}>Categoria</div>
+        <label style={{display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, border:`1px solid ${verbo ? "rgba(232,168,56,0.45)" : "rgba(255,255,255,0.12)"}`, background: verbo ? "rgba(232,168,56,0.08)" : "rgba(0,0,0,0.3)", cursor:"pointer", fontSize:"0.85rem", color:"#e8e6f0", fontFamily:"inherit"}}>
+          <input type="checkbox" checked={verbo} onChange={e => setVerbo(e.target.checked)} style={{width:16, height:16, accentColor:"#e8a838", cursor:"pointer"}} />
+          <span style={{fontWeight:700}}>⭐ Música do Verbo da Vida</span>
+        </label>
+        <div style={M.hint}>Marque se for uma música da Sede Verbo da Vida (afeta filtros e badges).</div>
 
         <div style={M.label}>Temas (até 3, em ordem de relevância)</div>
         <div style={M.chipsRow}>
