@@ -366,6 +366,13 @@ export default function Repertorio() {
   const [savingFlash, setSavingFlash] = useState(false);
   const [showPessoas, setShowPessoas] = useState(false);
   const [showAddSong, setShowAddSong] = useState(false);
+  // ── Bulk select (admin) ──
+  // Modo onde o admin marca várias músicas e atribui "Indicado por" em lote.
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkSel, setBulkSel] = useState(() => new Set()); // videoIds
+  const [showBulkAssign, setShowBulkAssign] = useState(false);
+  const [bulkPick, setBulkPick] = useState("");
+  const [savingBulk, setSavingBulk] = useState(false);
   // Histórico de repertórios (admin only)
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState([]);
@@ -634,6 +641,71 @@ export default function Repertorio() {
         if (raw) setDetail(getEffectiveSong(raw));
       }
     } finally { setSavingFlash(false); }
+  }
+
+  // ── Bulk select helpers (admin) ─────────────────────────────────────
+  function toggleBulk(vid) {
+    setBulkSel(prev => {
+      const next = new Set(prev);
+      if (next.has(vid)) next.delete(vid);
+      else next.add(vid);
+      return next;
+    });
+  }
+  function exitBulkMode() {
+    setBulkMode(false);
+    setBulkSel(new Set());
+    setShowBulkAssign(false);
+    setBulkPick("");
+  }
+  // Atribui o "Indicado por" escolhido a TODAS as músicas em bulkSel.
+  // Persiste em UM único PUT para overrides + (se houver custom songs)
+  // UM único PUT para custom_songs.
+  async function handleBulkAssign() {
+    const target = (bulkPick || "").trim();
+    if (bulkSel.size === 0) return;
+    setSavingBulk(true);
+    try {
+      const customIds = new Set(customSongs.map(c => c.videoId));
+      let nextOv = { ...overrides };
+      let nextCustom = customSongs;
+      let touchedCustom = false;
+
+      bulkSel.forEach(vid => {
+        if (customIds.has(vid)) {
+          // Custom song: edita o objeto direto (sem override).
+          if (!touchedCustom) { nextCustom = [...customSongs]; touchedCustom = true; }
+          const idx = nextCustom.findIndex(c => c.videoId === vid);
+          if (idx >= 0) nextCustom[idx] = { ...nextCustom[idx], indicadaPor: target };
+          return;
+        }
+        // Música base: usa override.
+        const baseSong = SONGS.find(s => s.videoId === vid);
+        if (!baseSong) return;
+        const baseName = (baseSong.indicadaPor || "").trim();
+        const cur = nextOv[vid] ? { ...nextOv[vid] } : {};
+        if (target === baseName) {
+          // Igual ao base — remove override (ou apaga só o campo).
+          if ("indicadaPor" in cur) delete cur.indicadaPor;
+        } else {
+          cur.indicadaPor = target;
+        }
+        if (Object.keys(cur).length === 0) delete nextOv[vid];
+        else nextOv[vid] = cur;
+      });
+
+      const ops = [apiPut("repertorio_overrides", nextOv)];
+      if (touchedCustom) ops.push(apiPut("repertorio_custom_songs", nextCustom));
+      await Promise.all(ops);
+      setOverrides(nextOv);
+      if (touchedCustom) setCustomSongs(nextCustom);
+      exitBulkMode();
+    } catch (e) {
+      console.error("Bulk assign failed", e);
+      alert("Falha ao salvar. Tente novamente.");
+    } finally {
+      setSavingBulk(false);
+    }
   }
 
   const filtered = effectiveSongs.filter(s => {
@@ -952,6 +1024,20 @@ export default function Repertorio() {
               📜 Histórico
             </button>
           )}
+          {admin && (
+            <button
+              type="button"
+              onClick={() => { if (bulkMode) exitBulkMode(); else setBulkMode(true); }}
+              style={{
+                ...S.stat,
+                ...(bulkMode ? S.statAdmin : {}),
+                cursor: "pointer", fontFamily: "inherit", fontWeight: 700,
+              }}
+              title="Marcar Indicado por em várias músicas de uma vez"
+            >
+              {bulkMode ? "✕ Sair seleção" : "🎯 Selecionar várias"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -995,15 +1081,23 @@ export default function Repertorio() {
             <div style={S.noResults}>Nenhuma música encontrada</div>
           ) : filtered.map(s => {
             const isSel = selected.some(x => x.num === s.num);
+            const isBulk = bulkMode && bulkSel.has(s.videoId);
             const t = thumb(s.videoId);
             const cardStyle = {
               ...S.card,
               ...(s.verbo ? S.cardVerbo : {}),
-              ...(isSel ? S.cardSelected : {}),
+              ...((bulkMode ? isBulk : isSel) ? S.cardSelected : {}),
             };
-            const checkStyle = { ...S.check, ...(isSel ? S.checkSel : {}) };
+            const checkStyle = {
+              ...S.check,
+              ...((bulkMode ? isBulk : isSel) ? S.checkSel : {}),
+            };
+            const handleCardClick = () => {
+              if (bulkMode) toggleBulk(s.videoId);
+              else setDetail(s);
+            };
             return (
-              <div key={s.num} style={cardStyle} className="song-card" onClick={() => setDetail(s)}>
+              <div key={s.num} style={cardStyle} className="song-card" onClick={handleCardClick}>
                 {t ? <img src={t} style={S.thumb} className="song-thumb" loading="lazy" alt="" /> : <div style={S.thumb} className="song-thumb" />}
                 <div style={S.info}>
                   <div style={S.title} className="song-title">{s.musica}</div>
@@ -1038,8 +1132,17 @@ export default function Repertorio() {
                     })}
                   </div>
                 </div>
-                <div style={checkStyle} className="song-check" onClick={(e) => { e.stopPropagation(); toggle(s.num); }} title={isSel ? "Remover" : "Adicionar"}>
-                  {isSel ? "✓" : "+"}
+                <div
+                  style={checkStyle}
+                  className="song-check"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (bulkMode) toggleBulk(s.videoId);
+                    else toggle(s.num);
+                  }}
+                  title={bulkMode ? (isBulk ? "Desmarcar" : "Selecionar para edição em massa") : (isSel ? "Remover" : "Adicionar")}
+                >
+                  {(bulkMode ? isBulk : isSel) ? "✓" : "+"}
                 </div>
               </div>
             );
@@ -1047,7 +1150,38 @@ export default function Repertorio() {
         </div>
       </div>
 
+      {/* BULK ACTION BAR — replaces bottom dock when admin is in bulk mode */}
+      {bulkMode && (
+        <div style={S.bottom} className="bottom-dock">
+          <div style={S.bottomContent}>
+            <div style={S.repHeader}>
+              <span style={S.repTitle}>🎯 Edição em massa</span>
+              <span style={S.repCount}>{bulkSel.size} selecionada(s)</span>
+            </div>
+            <div style={{fontSize:"0.78rem",color:"var(--text-muted)",marginBottom:10,lineHeight:1.5}}>
+              Toque nas músicas para selecioná-las e depois atribua quem indicou (ou limpe).
+            </div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+              <button
+                onClick={exitBulkMode}
+                style={{...S.btnGenerate, background:"var(--chip-bg)", color:"var(--text)", border:"1px solid var(--border-strong)"}}
+              >
+                ✕ Cancelar
+              </button>
+              <button
+                disabled={bulkSel.size === 0}
+                onClick={() => { setBulkPick(""); setShowBulkAssign(true); }}
+                style={{...S.btnGenerate, ...(bulkSel.size > 0 ? S.btnEnabled : S.btnDisabled)}}
+              >
+                ✏ Atribuir Indicado por
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* BOTTOM DOCK */}
+      {!bulkMode && (
       <div style={S.bottom} className="bottom-dock">
         <div style={S.bottomContent}>
           <div style={S.repHeader}>
@@ -1085,6 +1219,44 @@ export default function Repertorio() {
           </button>
         </div>
       </div>
+      )}
+
+      {/* BULK ASSIGN MODAL */}
+      {showBulkAssign && (
+        <div style={S.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget && !savingBulk) setShowBulkAssign(false); }}>
+          <div className="v-scale" style={{width:"100%",maxWidth:440,padding:"26px 26px 28px",borderRadius:24,background:"var(--surface-strong)",backdropFilter:"blur(24px) saturate(180%)",WebkitBackdropFilter:"blur(24px) saturate(180%)",border:"1px solid var(--border-strong)",boxShadow:"var(--shadow-lg)"}}>
+            <div style={{fontSize:"1.2rem",fontWeight:800,color:"var(--text)",marginBottom:4}}>🎯 Atribuir Indicado por</div>
+            <div style={{fontSize:"0.82rem",color:"var(--text-muted)",marginBottom:16}}>
+              {bulkSel.size} música(s) selecionada(s). Escolha o cantor que indicou — ou deixe vazio para limpar.
+            </div>
+            <div style={{fontSize:"0.7rem",fontWeight:800,color:"var(--text-faint)",textTransform:"uppercase",letterSpacing:"0.08em",marginBottom:6}}>Indicado por</div>
+            <PersonPicker
+              value={bulkPick}
+              pessoas={pessoas}
+              placeholder="Selecionar cantor..."
+              onChange={setBulkPick}
+            />
+            <div style={{display:"flex",gap:8,marginTop:24}}>
+              <button
+                type="button"
+                onClick={() => setShowBulkAssign(false)}
+                disabled={savingBulk}
+                style={{padding:"12px 16px",borderRadius:12,border:"1px solid var(--border-strong)",background:"transparent",color:"var(--text-muted)",fontWeight:600,fontSize:"0.88rem",cursor:"pointer",fontFamily:"inherit"}}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkAssign}
+                disabled={savingBulk}
+                style={{flex:1,padding:"12px 16px",borderRadius:12,border:"none",background:"linear-gradient(135deg, var(--accent), var(--accent-strong))",color:"#fff",fontWeight:800,fontSize:"0.9rem",cursor:savingBulk?"not-allowed":"pointer",fontFamily:"inherit",boxShadow:"0 6px 16px rgba(16,185,129,0.30)",opacity:savingBulk?0.7:1}}
+              >
+                {savingBulk ? "Salvando..." : (bulkPick ? `Aplicar a ${bulkSel.size} música(s)` : `Limpar em ${bulkSel.size} música(s)`)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DETAIL MODAL — centered with YouTube embed */}
       {detail && (

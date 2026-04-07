@@ -20,6 +20,10 @@ const ADMIN_PROTECTED_KEYS = new Set([
   'repertorio_temas',
   'song_keys',
   'pessoas_repertorio',
+  'repertorio_custom_songs',
+  'repertorio_deleted',
+  'repertorio_celebracao',
+  'repertorio_history',
 ]);
 function requireAdmin(req, res, next) {
   if (!ADMIN_PASSWORD) {
