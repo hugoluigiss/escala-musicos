@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { LETRAS } from "./letras.js";
 import { TEMAS, TEMAS_DEF } from "./temas.js";
+import { apiGet, apiPut, adminLogin, isAdmin as checkIsAdmin, clearAdminPassword } from "./api.js";
+import { LoginModal, EditSongModal } from "./AdminEdit.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
 const SONGS=[
@@ -159,6 +161,11 @@ const S = {
   btnCopy: { width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#25d366", color: "#fff", fontFamily: "inherit", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 },
   outputClose: { marginTop: 8, width: "100%", padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#7a7890", fontFamily: "inherit", fontSize: "0.82rem", cursor: "pointer" },
   noResults: { textAlign: "center", padding: "40px 20px", color: "#4a4860", fontSize: "0.88rem" },
+  adminBtn: { padding: "5px 12px", borderRadius: 16, border: "1px solid rgba(232,168,56,0.35)", background: "rgba(232,168,56,0.08)", color: "#e8a838", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginLeft: 6 },
+  adminOnBtn: { padding: "5px 12px", borderRadius: 16, border: "1px solid rgba(74,222,128,0.4)", background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginLeft: 6 },
+  editBtn: { width: "100%", marginTop: 8, padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(232,168,56,0.4)", background: "rgba(232,168,56,0.1)", color: "#e8a838", fontFamily: "inherit", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" },
+  keyRow: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 },
+  keyChip: { fontSize: "0.7rem", padding: "3px 9px", borderRadius: 10, background: "rgba(91,200,175,0.1)", color: "#5bc8af", border: "1px solid rgba(91,200,175,0.25)", fontWeight: 600 },
 };
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
@@ -171,20 +178,122 @@ export default function Repertorio() {
   const [showOutput, setShowOutput] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // ── Admin / overrides state ──
+  const [admin, setAdmin] = useState(checkIsAdmin());
+  const [showLogin, setShowLogin] = useState(false);
+  const [editing, setEditing] = useState(null); // song being edited
+  const [overrides, setOverrides] = useState({});  // { videoId: { indicadaPor, tom } }
+  const [temasOver, setTemasOver] = useState({});  // { videoId: [tagId, ...] }
+  const [songKeys, setSongKeys] = useState({});    // { videoId: [{cantor, tom}, ...] }
+  const [pessoas, setPessoas] = useState([]);      // string[]
+  const [savingFlash, setSavingFlash] = useState(false);
+
+  // ── Load overrides from API on mount ──
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [ov, to, sk, pe] = await Promise.all([
+          apiGet("repertorio_overrides"),
+          apiGet("repertorio_temas"),
+          apiGet("song_keys"),
+          apiGet("pessoas_repertorio"),
+        ]);
+        if (cancelled) return;
+        if (ov && typeof ov === "object") setOverrides(ov);
+        if (to && typeof to === "object") setTemasOver(to);
+        if (sk && typeof sk === "object") setSongKeys(sk);
+        if (pe && Array.isArray(pe)) setPessoas(pe);
+        else {
+          // seed default pessoas from existing indicadaPor field
+          const defaults = Array.from(new Set(SONGS.map(s => s.indicadaPor).filter(Boolean))).sort();
+          setPessoas(defaults);
+        }
+      } catch (e) { console.error("Failed to load overrides", e); }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, []);
+
+  // ── Helpers: apply overrides on top of base data ──
+  function getEffectiveSong(s) {
+    const ov = overrides[s.videoId];
+    if (!ov) return s;
+    return {
+      ...s,
+      indicadaPor: ov.indicadaPor !== undefined && ov.indicadaPor !== "" ? ov.indicadaPor : s.indicadaPor,
+      tom: ov.tom !== undefined && ov.tom !== "" ? ov.tom : s.tom,
+    };
+  }
+  function getEffectiveTemas(s) {
+    return temasOver[s.videoId] || TEMAS[s.videoId] || [];
+  }
+  function getKeysFor(s) {
+    return songKeys[s.videoId] || [];
+  }
+
+  const effectiveSongs = SONGS.map(getEffectiveSong);
+
   const hasVerbo = selected.some(s => s.verbo);
   const canGenerate = selected.length === 4 && hasVerbo;
 
-  const filtered = SONGS.filter(s => {
+  // ── Admin actions ──
+  async function handleLogin(pw) {
+    await adminLogin(pw);
+    setAdmin(true);
+  }
+  function handleLogout() {
+    clearAdminPassword();
+    setAdmin(false);
+  }
+  async function handleSaveEdit(payload) {
+    const { temas: newTemas, override, keys, pessoas: newPessoas } = payload;
+    const vid = editing.videoId;
+    // Build next maps
+    const nextOv = { ...overrides };
+    if ((override.indicadaPor || "").trim() === "" && (override.tom || "").trim() === "") {
+      delete nextOv[vid];
+    } else {
+      nextOv[vid] = { indicadaPor: override.indicadaPor, tom: override.tom };
+    }
+    const nextTemas = { ...temasOver };
+    if (Array.isArray(newTemas) && newTemas.length > 0) nextTemas[vid] = newTemas;
+    else delete nextTemas[vid];
+    const nextKeys = { ...songKeys };
+    if (Array.isArray(keys) && keys.length > 0) nextKeys[vid] = keys;
+    else delete nextKeys[vid];
+    const nextPessoas = Array.isArray(newPessoas) ? newPessoas : pessoas;
+
+    setSavingFlash(true);
+    try {
+      await Promise.all([
+        apiPut("repertorio_overrides", nextOv),
+        apiPut("repertorio_temas", nextTemas),
+        apiPut("song_keys", nextKeys),
+        apiPut("pessoas_repertorio", nextPessoas),
+      ]);
+      setOverrides(nextOv);
+      setTemasOver(nextTemas);
+      setSongKeys(nextKeys);
+      setPessoas(nextPessoas);
+      // refresh detail view if open
+      if (detail && detail.videoId === vid) {
+        setDetail(getEffectiveSong(SONGS.find(s => s.videoId === vid)));
+      }
+    } finally { setSavingFlash(false); }
+  }
+
+  const filtered = effectiveSongs.filter(s => {
     if (filter === "verbo" && !s.verbo) return false;
     if (filter === "other" && s.verbo) return false;
-    if (["matheus","jokasta","madalena","aline"].includes(filter) && !s.indicadaPor.toLowerCase().includes(filter)) return false;
+    if (["matheus","jokasta","madalena","aline"].includes(filter) && !(s.indicadaPor || "").toLowerCase().includes(filter)) return false;
     if (tema !== "all") {
-      const songTemas = TEMAS[s.videoId] || [];
+      const songTemas = getEffectiveTemas(s);
       if (!songTemas.includes(tema)) return false;
     }
     if (search) {
       const q = search.toLowerCase();
-      return s.musica.toLowerCase().includes(q) || s.artista.toLowerCase().includes(q) || s.indicadaPor.toLowerCase().includes(q);
+      return s.musica.toLowerCase().includes(q) || s.artista.toLowerCase().includes(q) || (s.indicadaPor||"").toLowerCase().includes(q);
     }
     return true;
   });
@@ -195,7 +304,8 @@ export default function Repertorio() {
       setSelected(selected.filter(s => s.num !== num));
     } else {
       if (selected.length >= 4) return;
-      setSelected([...selected, SONGS.find(s => s.num === num)]);
+      const base = SONGS.find(s => s.num === num);
+      setSelected([...selected, getEffectiveSong(base)]);
     }
   }
 
@@ -246,6 +356,10 @@ export default function Repertorio() {
         <div style={S.nav}>
           <a href="/escala" style={S.navBtn}>📅 Escala</a>
           <span style={{...S.navBtn, background:"rgba(201,169,110,0.2)", borderColor:"rgba(201,169,110,0.4)"}}>🎵 Repertório</span>
+          {admin
+            ? <button style={S.adminOnBtn} onClick={handleLogout} title="Sair do modo admin">✓ Admin{savingFlash ? " ⏳" : ""}</button>
+            : <button style={S.adminBtn} onClick={() => setShowLogin(true)}>🔐 Admin</button>
+          }
         </div>
       </div>
 
@@ -306,7 +420,7 @@ export default function Repertorio() {
                   {s.verbo && <span style={S.badgeVerbo}>⭐ Verbo da Vida</span>}
                   {s.indicadaPor && <span style={S.badgePerson}>{s.indicadaPor}</span>}
                   {s.tom && s.tom !== "-" && <span style={S.badgeTom}>{s.tom}</span>}
-                  {(TEMAS[s.videoId] || []).map(tid => {
+                  {getEffectiveTemas(s).map(tid => {
                     const def = TEMAS_DEF[tid]; if (!def) return null;
                     return <span key={tid} style={{...S.badgeTema, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
                   })}
@@ -369,17 +483,32 @@ export default function Repertorio() {
                 {detail.verbo && <span style={{...S.modalBadge,background:"rgba(232,168,56,0.15)",color:"#e8a838",border:"1px solid rgba(232,168,56,0.3)"}}>⭐ Verbo da Vida</span>}
                 {detail.indicadaPor && <span style={{...S.modalBadge,background:"rgba(108,99,255,0.12)",color:"#a99bff",border:"1px solid rgba(108,99,255,0.25)"}}>Indicada por: {detail.indicadaPor}</span>}
                 {detail.tom && detail.tom!=="-" && <span style={{...S.modalBadge,background:"rgba(91,200,175,0.12)",color:"#5bc8af",border:"1px solid rgba(91,200,175,0.25)"}}>Tom: {detail.tom}</span>}
-                {(TEMAS[detail.videoId] || []).map(tid => {
+                {getEffectiveTemas(detail).map(tid => {
                   const def = TEMAS_DEF[tid]; if (!def) return null;
                   return <span key={tid} style={{...S.modalBadge, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
                 })}
               </div>
+              {getKeysFor(detail).length > 0 && (
+                <>
+                  <div style={S.letraTitle}>🎼 Tons por cantor</div>
+                  <div style={S.keyRow}>
+                    {getKeysFor(detail).map((k, i) => (
+                      <span key={i} style={S.keyChip}>{k.cantor || "?"} → <b>{k.tom || "—"}</b></span>
+                    ))}
+                  </div>
+                </>
+              )}
               <div style={S.modalActions}>
                 {detail.videoId && <a href={ytLink(detail.videoId)} target="_blank" rel="noreferrer" style={S.modalYt}>▶ YouTube</a>}
                 <button onClick={() => { toggle(detail.num); }} style={{...S.modalSelect, background: selected.some(x=>x.num===detail.num) ? "#16a34a" : "#6c63ff"}}>
                   {selected.some(x=>x.num===detail.num) ? "✓ Selecionada" : "+ Adicionar"}
                 </button>
               </div>
+              {admin && (
+                <button style={S.editBtn} onClick={() => setEditing(detail)}>
+                  ✏️ Editar música (admin)
+                </button>
+              )}
               <div style={S.letraTitle}>📜 Letra</div>
               {LETRAS[detail.videoId] && LETRAS[detail.videoId].trim()
                 ? <div style={S.letraBox}>{LETRAS[detail.videoId]}</div>
@@ -388,6 +517,22 @@ export default function Repertorio() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* LOGIN MODAL */}
+      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} onLogin={handleLogin} />
+
+      {/* EDIT MODAL */}
+      {editing && (
+        <EditSongModal
+          song={editing}
+          currentTemas={getEffectiveTemas(editing)}
+          currentOverride={overrides[editing.videoId]}
+          currentKeys={getKeysFor(editing)}
+          pessoas={pessoas}
+          onSave={handleSaveEdit}
+          onClose={() => setEditing(null)}
+        />
       )}
 
       {/* OUTPUT MODAL */}

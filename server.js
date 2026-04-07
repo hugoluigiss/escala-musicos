@@ -9,6 +9,29 @@ const __dirname = path.dirname(__filename);
 const app = express();
 app.use(express.json({ limit: '5mb' }));
 
+// ─── ADMIN AUTH ─────────────────────────────────────────────────────────────
+// Set ADMIN_PASSWORD as an environment variable on Railway.
+// All write endpoints require the X-Admin-Password header to match.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// Keys that require admin auth to write. All other keys remain open
+// (so the existing escala features keep working without auth).
+const ADMIN_PROTECTED_KEYS = new Set([
+  'repertorio_overrides',
+  'repertorio_temas',
+  'song_keys',
+  'pessoas_repertorio',
+]);
+function requireAdmin(req, res, next) {
+  if (!ADMIN_PASSWORD) {
+    return res.status(503).json({ error: 'admin_password_not_set' });
+  }
+  const provided = req.headers['x-admin-password'];
+  if (!provided || provided !== ADMIN_PASSWORD) {
+    return res.status(401).json({ error: 'unauthorized' });
+  }
+  next();
+}
+
 // ─── DATABASE ───────────────────────────────────────────────────────────────
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
@@ -47,10 +70,26 @@ app.get('/api/data/:key', async (req, res) => {
   }
 });
 
+// Admin login: verify password (returns ok or 401)
+app.post('/api/admin/login', (req, res) => {
+  if (!ADMIN_PASSWORD) return res.status(503).json({ error: 'admin_password_not_set' });
+  const { password } = req.body || {};
+  if (password === ADMIN_PASSWORD) return res.json({ ok: true });
+  return res.status(401).json({ error: 'unauthorized' });
+});
+
 // Save a value by key
 app.put('/api/data/:key', async (req, res) => {
   try {
     const { key } = req.params;
+    // Gate writes to admin-protected keys
+    if (ADMIN_PROTECTED_KEYS.has(key)) {
+      if (!ADMIN_PASSWORD) return res.status(503).json({ error: 'admin_password_not_set' });
+      const provided = req.headers['x-admin-password'];
+      if (!provided || provided !== ADMIN_PASSWORD) {
+        return res.status(401).json({ error: 'unauthorized' });
+      }
+    }
     const { value } = req.body;
     await pool.query(
       `INSERT INTO app_data (key, value, updated_at)
