@@ -158,11 +158,27 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
         <div style={M.label}>Artista</div>
         <input style={M.input} value={artista} onChange={e => setArtista(e.target.value)} placeholder="Nome do artista / banda" />
 
-        <div style={M.label}>Categoria</div>
-        <label style={{display:"flex", alignItems:"center", gap:10, padding:"10px 12px", borderRadius:8, border:`1px solid ${verbo ? "rgba(232,168,56,0.45)" : "rgba(255,255,255,0.12)"}`, background: verbo ? "rgba(232,168,56,0.08)" : "rgba(0,0,0,0.3)", cursor:"pointer", fontSize:"0.85rem", color:"#e8e6f0", fontFamily:"inherit"}}>
-          <input type="checkbox" checked={verbo} onChange={e => setVerbo(e.target.checked)} style={{width:16, height:16, accentColor:"#e8a838", cursor:"pointer"}} />
-          <span style={{fontWeight:700}}>⭐ Música do Verbo da Vida</span>
-        </label>
+        <div style={M.label}>Tags</div>
+        <div style={M.chipsRow}>
+          <button
+            type="button"
+            onClick={() => setVerbo(v => !v)}
+            style={verbo
+              ? {
+                  padding: "6px 12px", borderRadius: 18,
+                  border: "1px solid rgba(232,168,56,0.55)",
+                  background: "rgba(232,168,56,0.18)",
+                  color: "#e8a838", fontSize: "0.72rem", cursor: "pointer",
+                  fontFamily: "inherit", fontWeight: 800,
+                  boxShadow: "inset 0 0 0 2px rgba(255,255,255,0.06)",
+                }
+              : M.chip
+            }
+            title="Clique para marcar/desmarcar como música do Verbo da Vida"
+          >
+            ⭐ Verbo da Vida
+          </button>
+        </div>
         <div style={M.hint}>Marque se for uma música da Sede Verbo da Vida (afeta filtros e badges).</div>
 
         <div style={M.label}>Temas (até 3, em ordem de relevância)</div>
