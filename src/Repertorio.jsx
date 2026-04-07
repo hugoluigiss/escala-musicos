@@ -132,7 +132,26 @@ const S = {
   },
   visionText: {
     fontSize: "0.86rem", lineHeight: 1.5, color: "var(--text)",
-    margin: 0,
+    margin: "0 0 10px",
+  },
+  verseList: {
+    marginTop: 12, paddingTop: 12,
+    borderTop: "1px solid var(--verbo-border)",
+    display: "flex", flexDirection: "column", gap: 10,
+  },
+  verse: {
+    padding: "8px 12px",
+    background: "var(--surface)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+  },
+  verseText: {
+    fontSize: "0.8rem", lineHeight: 1.5, color: "var(--text)",
+    fontStyle: "italic",
+  },
+  verseRef: {
+    fontSize: "0.72rem", fontWeight: 700, color: "var(--verbo-text)",
+    marginTop: 4, textAlign: "right",
   },
   stats: { display: "flex", gap: 10, justifyContent: "center", marginTop: 18, flexWrap: "wrap" },
   stat: { padding: "8px 16px", borderRadius: 999, fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 600, background: "var(--surface)", border: "1px solid var(--border)", backdropFilter: "blur(var(--blur))", WebkitBackdropFilter: "blur(var(--blur))" },
@@ -850,9 +869,31 @@ export default function Repertorio() {
         <div style={S.visionCard} className="vision-card">
           <div style={S.visionTitle}>⭐ Nossa Visão</div>
           <p style={S.visionText}>
-            Somos chamados a <b>cantar a Palavra da Fé</b>. Por isso valorizamos os ministros que carregam a nossa visão —
+            Nós cantamos a <b>Palavra da Fé!</b> Por isso valorizamos os ministros que carregam a nossa visão —
             <b> ao menos uma música do Verbo da Vida</b> deve estar presente em cada repertório.
           </p>
+          <p style={S.visionText}>
+            Ore por este momento, consagre-se, medite na Palavra relacionada ao repertório que o Espírito Santo lhe direcionou.
+            Deus está se movendo através do seu trabalho — <b>seja forte e corajoso</b>.
+          </p>
+          <div style={S.verseList}>
+            <div style={S.verse}>
+              <div style={S.verseText}>"Habite, em vós, ricamente, a palavra de Cristo; instruí-vos e aconselhai-vos mutuamente em toda a sabedoria, louvando a Deus, com salmos, hinos e cânticos espirituais, com gratidão, em vosso coração."</div>
+              <div style={S.verseRef}>— Colossenses 3:16</div>
+            </div>
+            <div style={S.verse}>
+              <div style={S.verseText}>"Falando entre vós com salmos, hinos e cânticos espirituais, cantando e louvando de coração ao Senhor."</div>
+              <div style={S.verseRef}>— Efésios 5:19</div>
+            </div>
+            <div style={S.verse}>
+              <div style={S.verseText}>"Por meio de Jesus, ofereçamos sempre a Deus sacrifício de louvor, isto é, o fruto de lábios que confessam o seu nome."</div>
+              <div style={S.verseRef}>— Hebreus 13:15</div>
+            </div>
+            <div style={S.verse}>
+              <div style={S.verseText}>"Cantarei com o espírito, mas também cantarei com o entendimento."</div>
+              <div style={S.verseRef}>— 1 Coríntios 14:15</div>
+            </div>
+          </div>
         </div>
         <div style={S.stats}>
           <span style={S.stat}><b>{SONGS.length}</b> &nbsp;músicas</span>
