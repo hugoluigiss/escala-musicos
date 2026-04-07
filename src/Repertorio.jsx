@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { LETRAS } from "./letras.js";
+import { TEMAS, TEMAS_DEF } from "./temas.js";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
 const SONGS=[
@@ -108,6 +110,9 @@ const S = {
   badgeVerbo: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(232,168,56,0.15)", color: "#e8a838" },
   badgePerson: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(108,99,255,0.12)", color: "#a99bff" },
   badgeTom: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(91,200,175,0.12)", color: "#5bc8af" },
+  badgeTema: { fontSize: "0.58rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600 },
+  temaRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 12, marginTop: -4 },
+  temaChip: { padding: "5px 11px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#7a7890", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", fontWeight: 600 },
   check: { width: 22, height: 22, borderRadius: 6, border: "2px solid rgba(255,255,255,0.1)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "transparent" },
   checkSel: { background: "#6c63ff", borderColor: "#6c63ff", color: "#fff" },
   checkSelVerbo: { background: "#e8a838", borderColor: "#e8a838", color: "#1a1440" },
@@ -144,6 +149,9 @@ const S = {
   modalYt: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 16px", background: "#ff0000", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" },
   modalSelect: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 16px", borderRadius: 8, border: "none", fontFamily: "inherit", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer", color: "#fff" },
   modalClose: { width: "100%", marginTop: 8, padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#7a7890", fontFamily: "inherit", fontSize: "0.82rem", cursor: "pointer" },
+  letraTitle: { marginTop: 16, marginBottom: 6, fontSize: "0.78rem", fontWeight: 700, color: "#c9a96e", letterSpacing: "0.05em", textTransform: "uppercase" },
+  letraBox: { background: "rgba(0,0,0,0.3)", padding: 14, borderRadius: 8, fontSize: "0.85rem", lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#d8d6e8", border: "1px solid rgba(255,255,255,0.06)", maxHeight: "40vh", overflowY: "auto", fontFamily: "'Inter','Segoe UI',sans-serif" },
+  letraEmpty: { background: "rgba(255,255,255,0.03)", padding: 14, borderRadius: 8, fontSize: "0.8rem", color: "#7a7890", fontStyle: "italic", textAlign: "center", border: "1px dashed rgba(255,255,255,0.1)" },
   // Output
   outputBox: { background: "#1a1440", borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 560, padding: 20, maxHeight: "85vh", overflowY: "auto", border: "1px solid rgba(201,169,110,0.15)" },
   outputTitle: { fontSize: "1.1rem", fontWeight: 700, marginBottom: 14, textAlign: "center" },
@@ -158,6 +166,7 @@ export default function Repertorio() {
   const [selected, setSelected] = useState([]);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [tema, setTema] = useState("all");
   const [detail, setDetail] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -169,6 +178,10 @@ export default function Repertorio() {
     if (filter === "verbo" && !s.verbo) return false;
     if (filter === "other" && s.verbo) return false;
     if (["matheus","jokasta","madalena","aline"].includes(filter) && !s.indicadaPor.toLowerCase().includes(filter)) return false;
+    if (tema !== "all") {
+      const songTemas = TEMAS[s.videoId] || [];
+      if (!songTemas.includes(tema)) return false;
+    }
     if (search) {
       const q = search.toLowerCase();
       return s.musica.toLowerCase().includes(q) || s.artista.toLowerCase().includes(q) || s.indicadaPor.toLowerCase().includes(q);
@@ -253,6 +266,21 @@ export default function Repertorio() {
           ))}
         </div>
 
+        {/* Tema chips */}
+        <div style={S.temaRow}>
+          <button onClick={() => setTema("all")}
+            style={{...S.temaChip, ...(tema==="all" ? {background:"rgba(108,99,255,0.25)", borderColor:"rgba(108,99,255,0.4)", color:"#a99bff"} : {})}}
+          >Todos os temas</button>
+          {Object.entries(TEMAS_DEF).map(([id, def]) => (
+            <button key={id} onClick={() => setTema(id)}
+              style={{
+                ...S.temaChip,
+                ...(tema===id ? {background: def.bg, border:`1px solid ${def.border}`, color: def.color} : {})
+              }}
+            >{def.label}</button>
+          ))}
+        </div>
+
         {/* Song List */}
         {filtered.length === 0 ? (
           <div style={S.noResults}>Nenhuma música encontrada</div>
@@ -278,6 +306,10 @@ export default function Repertorio() {
                   {s.verbo && <span style={S.badgeVerbo}>⭐ Verbo da Vida</span>}
                   {s.indicadaPor && <span style={S.badgePerson}>{s.indicadaPor}</span>}
                   {s.tom && s.tom !== "-" && <span style={S.badgeTom}>{s.tom}</span>}
+                  {(TEMAS[s.videoId] || []).map(tid => {
+                    const def = TEMAS_DEF[tid]; if (!def) return null;
+                    return <span key={tid} style={{...S.badgeTema, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
+                  })}
                 </div>
               </div>
               <div style={checkStyle} onClick={() => toggle(s.num)}>
@@ -337,6 +369,10 @@ export default function Repertorio() {
                 {detail.verbo && <span style={{...S.modalBadge,background:"rgba(232,168,56,0.15)",color:"#e8a838",border:"1px solid rgba(232,168,56,0.3)"}}>⭐ Verbo da Vida</span>}
                 {detail.indicadaPor && <span style={{...S.modalBadge,background:"rgba(108,99,255,0.12)",color:"#a99bff",border:"1px solid rgba(108,99,255,0.25)"}}>Indicada por: {detail.indicadaPor}</span>}
                 {detail.tom && detail.tom!=="-" && <span style={{...S.modalBadge,background:"rgba(91,200,175,0.12)",color:"#5bc8af",border:"1px solid rgba(91,200,175,0.25)"}}>Tom: {detail.tom}</span>}
+                {(TEMAS[detail.videoId] || []).map(tid => {
+                  const def = TEMAS_DEF[tid]; if (!def) return null;
+                  return <span key={tid} style={{...S.modalBadge, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
+                })}
               </div>
               <div style={S.modalActions}>
                 {detail.videoId && <a href={ytLink(detail.videoId)} target="_blank" rel="noreferrer" style={S.modalYt}>▶ YouTube</a>}
@@ -344,6 +380,10 @@ export default function Repertorio() {
                   {selected.some(x=>x.num===detail.num) ? "✓ Selecionada" : "+ Adicionar"}
                 </button>
               </div>
+              <div style={S.letraTitle}>📜 Letra</div>
+              {LETRAS[detail.videoId] && LETRAS[detail.videoId].trim()
+                ? <div style={S.letraBox}>{LETRAS[detail.videoId]}</div>
+                : <div style={S.letraEmpty}>Letra ainda não cadastrada</div>}
               <button style={S.modalClose} onClick={() => setDetail(null)}>Fechar</button>
             </div>
           </div>
