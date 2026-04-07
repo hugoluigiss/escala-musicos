@@ -172,6 +172,8 @@ const S = {
     boxShadow: "0 0 0 2px rgba(250,204,21,0.10)",
   },
   badgePerson: { background: "var(--chip-bg)", color: "var(--chip-text)", border: "1px solid var(--border)" },
+  indicadaLine: { fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 6, marginBottom: 2 },
+  indicadaLabel: { color: "var(--text-faint)", fontWeight: 600 },
   badgeTom: { background: "var(--accent-soft)", color: "var(--accent-text)", border: "1px solid var(--accent-border)" },
   badgeTema: { },
 
@@ -917,6 +919,11 @@ export default function Repertorio() {
                 <div style={S.info}>
                   <div style={S.title}>{s.musica}</div>
                   <div style={S.artist}>{s.artista}</div>
+                  {s.indicadaPor && (
+                    <div style={S.indicadaLine}>
+                      <span style={S.indicadaLabel}>Indicado por:</span> {s.indicadaPor}
+                    </div>
+                  )}
                   <div style={S.badges}>
                     {s.verbo && <span style={{...S.badge, ...S.badgeVerbo}}>⭐ Verbo da Vida</span>}
                     {/* Celebração: badge para todos quando marcada; toggle clicável apenas para admin */}
@@ -935,7 +942,6 @@ export default function Repertorio() {
                     ) : (
                       isCelebracao(s) && <span style={{...S.badge, ...S.badgeCeleb}}>🎉 Celebração</span>
                     )}
-                    {s.indicadaPor && <span style={{...S.badge, ...S.badgePerson}}>{s.indicadaPor}</span>}
                     {s.tom && s.tom !== "-" && <span style={{...S.badge, ...S.badgeTom}}>♪ {s.tom}</span>}
                     {getEffectiveTemas(s).map(tid => {
                       const def = TEMAS_DEF[tid]; if (!def) return null;
