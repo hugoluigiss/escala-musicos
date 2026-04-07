@@ -155,6 +155,22 @@ const S = {
   badges: { display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" },
   badge: { fontSize: "0.65rem", padding: "2px 8px", borderRadius: 8, fontWeight: 700, letterSpacing: "0.02em" },
   badgeVerbo: { background: "var(--verbo-soft)", color: "var(--verbo-text)", border: "1px solid var(--verbo-border)" },
+  badgeCeleb: { background: "rgba(250,204,21,0.18)", color: "#b45309", border: "1px solid rgba(250,204,21,0.45)" },
+  // Admin-only celebration toggle on each card.
+  celebToggle: {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    padding: "2px 9px", borderRadius: 999,
+    border: "1.5px dashed rgba(250,204,21,0.45)",
+    background: "transparent", color: "var(--text-faint)",
+    fontSize: "0.65rem", fontWeight: 700, cursor: "pointer",
+    fontFamily: "inherit",
+  },
+  celebToggleOn: {
+    background: "rgba(250,204,21,0.22)",
+    border: "1.5px solid rgba(250,204,21,0.55)",
+    color: "#b45309",
+    boxShadow: "0 0 0 2px rgba(250,204,21,0.10)",
+  },
   badgePerson: { background: "var(--chip-bg)", color: "var(--chip-text)", border: "1px solid var(--border)" },
   badgeTom: { background: "var(--accent-soft)", color: "var(--accent-text)", border: "1px solid var(--accent-border)" },
   badgeTema: { },
@@ -297,6 +313,7 @@ export default function Repertorio() {
   const [pessoas, setPessoas] = useState([]);      // string[]
   const [deletedSongs, setDeletedSongs] = useState([]);  // string[] of videoIds
   const [customSongs, setCustomSongs] = useState([]);    // custom song objects
+  const [celebracao, setCelebracao] = useState([]);      // string[] of videoIds (celebration songs)
   const [savingFlash, setSavingFlash] = useState(false);
   const [showPessoas, setShowPessoas] = useState(false);
   const [showAddSong, setShowAddSong] = useState(false);
@@ -306,13 +323,14 @@ export default function Repertorio() {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, to, sk, pe, del, cus] = await Promise.all([
+        const [ov, to, sk, pe, del, cus, cel] = await Promise.all([
           apiGet("repertorio_overrides"),
           apiGet("repertorio_temas"),
           apiGet("song_keys"),
           apiGet("pessoas_repertorio"),
           apiGet("repertorio_deleted"),
           apiGet("repertorio_custom_songs"),
+          apiGet("repertorio_celebracao"),
         ]);
         if (cancelled) return;
         if (ov && typeof ov === "object") setOverrides(ov);
@@ -320,6 +338,7 @@ export default function Repertorio() {
         if (sk && typeof sk === "object") setSongKeys(sk);
         if (del && Array.isArray(del)) setDeletedSongs(del);
         if (cus && Array.isArray(cus)) setCustomSongs(cus);
+        if (cel && Array.isArray(cel)) setCelebracao(cel);
         if (pe && Array.isArray(pe) && pe.length > 0) setPessoas(pe);
         else {
           // Seed: combina nomes do indicadaPor (base + overrides) com a banda
@@ -357,6 +376,25 @@ export default function Repertorio() {
   // Lookup the raw (pre-override) song by videoId across base + custom lists.
   function findRawSong(vid) {
     return SONGS.find(s => s.videoId === vid) || customSongs.find(s => s.videoId === vid);
+  }
+  function isCelebracao(s) {
+    return celebracao.includes(s.videoId);
+  }
+  // Toggle celebration flag for a song (admin only). Optimistic update.
+  async function toggleCelebracao(vid) {
+    if (!admin) return;
+    const next = celebracao.includes(vid)
+      ? celebracao.filter(v => v !== vid)
+      : [...celebracao, vid];
+    setCelebracao(next);
+    setSavingFlash(true);
+    try {
+      await apiPut("repertorio_celebracao", next);
+    } catch (e) {
+      // rollback on failure
+      setCelebracao(celebracao);
+      console.error("Failed to save celebracao", e);
+    } finally { setSavingFlash(false); }
   }
 
   // Base songs minus deleted, plus admin-created custom songs.
@@ -524,6 +562,7 @@ export default function Repertorio() {
 
   const filtered = effectiveSongs.filter(s => {
     if (filter === "verbo" && !s.verbo) return false;
+    if (filter === "celebracao" && !isCelebracao(s)) return false;
     if (filter === "none" && (s.indicadaPor || "").trim() !== "") return false;
     if (filter.startsWith("p:")) {
       const who = filter.slice(2);
@@ -588,6 +627,7 @@ export default function Repertorio() {
   const filters = [
     { id: "all", label: "Todas" },
     { id: "verbo", label: "⭐ Verbo da Vida" },
+    { id: "celebracao", label: "🎉 Celebração" },
     { id: "none", label: "Sem indicação" },
     ...cantoresFiltro.map(nome => ({ id: `p:${nome}`, label: nome })),
   ];
@@ -685,6 +725,22 @@ export default function Repertorio() {
                   <div style={S.artist}>{s.artista}</div>
                   <div style={S.badges}>
                     {s.verbo && <span style={{...S.badge, ...S.badgeVerbo}}>⭐ Verbo da Vida</span>}
+                    {/* Celebração: badge para todos quando marcada; toggle clicável apenas para admin */}
+                    {admin ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleCelebracao(s.videoId); }}
+                        style={{
+                          ...S.celebToggle,
+                          ...(isCelebracao(s) ? S.celebToggleOn : {}),
+                        }}
+                        title={isCelebracao(s) ? "Desmarcar Celebração" : "Marcar como Celebração"}
+                      >
+                        {isCelebracao(s) ? "🎉 Celebração" : "🎉 Marcar"}
+                      </button>
+                    ) : (
+                      isCelebracao(s) && <span style={{...S.badge, ...S.badgeCeleb}}>🎉 Celebração</span>
+                    )}
                     {s.indicadaPor && <span style={{...S.badge, ...S.badgePerson}}>{s.indicadaPor}</span>}
                     {s.tom && s.tom !== "-" && <span style={{...S.badge, ...S.badgeTom}}>♪ {s.tom}</span>}
                     {getEffectiveTemas(s).map(tid => {
@@ -763,6 +819,7 @@ export default function Repertorio() {
                 <div style={S.modalArtist}>{detail.artista}</div>
                 <div style={S.modalBadges}>
                   {detail.verbo && <span style={{...S.modalBadge, background:"var(--verbo-soft)", color:"var(--verbo-text)", border:"1px solid var(--verbo-border)"}}>⭐ Verbo da Vida</span>}
+                  {isCelebracao(detail) && <span style={{...S.modalBadge, ...S.badgeCeleb}}>🎉 Celebração</span>}
                   {detail.indicadaPor && <span style={{...S.modalBadge, background:"var(--chip-bg)", color:"var(--chip-text)", border:"1px solid var(--border)"}}>👤 {detail.indicadaPor}</span>}
                   {detail.tom && detail.tom!=="-" && <span style={{...S.modalBadge, background:"var(--accent-soft)", color:"var(--accent-text)", border:"1px solid var(--accent-border)"}}>♪ Tom {detail.tom}</span>}
                   {getEffectiveTemas(detail).map(tid => {
