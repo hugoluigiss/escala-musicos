@@ -70,5 +70,36 @@ export const TEMAS = {
   "t5iptUXVyX0": ["fe", "intimidade"],                  // Nada Me Falta — Eliezer Rodrigues (Salmo 23 / El Shaddai)
   "iqCM_yxslfU": ["amor", "fe"],                        // Teu Amor Não Falha — André Valadão (Your Love Never Fails)
 
-  // 41-70 (a classificar nos próximos lotes)
+  "phog1GGvzHU": ["fe"],                                // Pela Fé — André Valadão
+  "mAMyXHC85Nc": ["graca", "ressurreicao"],             // Nasci de Novo — André Valadão
+  "pfxh4uPy9dA": ["nome", "ressurreicao"],              // Sobre Todo Nome — Davi Silva
+  "QIuVWpLLYy8": ["ressurreicao", "intimidade"],        // Novo e Vivo Caminho — Verbo da Vida
+  "IMD1eBr1cfw": ["esperanca", "gratidao"],             // A Bênção — Gabriel Guedes / Misaias
+  "tesOYs6bIgc": ["entrega", "intimidade"],             // Vem, Esta é a Hora
+  "hDjFz6DOcQo": ["entrega", "intimidade"],             // Que Ele Cresça — Nívea Soares + Nathanael Brito
+  "5kzkPheDZiI": ["santidade", "entrega"],              // Santo + Que Ele Cresça — Thiago Godoi
+  "kHKVFxyTjsE": ["santidade", "soberania"],            // Ao Que Está Assentado / Nada Vai Roubar Tua Glória
+  "vzx_FT48k1o": ["alegria", "fe"],                     // A Alegria do Senhor — Eliezer Rodrigues
+
+  "qxzQR5uwWsk": ["entrega", "intimidade"],             // Tudo é Perda — Felipe Rodrigues (Fp 3:7-8)
+  "_SzVzMh7qfM": ["entrega", "fe"],                     // Eu Me Rendo — Leonardo Gonçalves
+  "4ks4j9KqXXk": ["entrega", "fe"],                     // Te Seguirei Até o Fim — Sede Verbo da Vida (Kaleb & Josh)
+  "XUs7nuz6c0M": ["fe", "vitoria"],                     // Sobre as Águas — Rapha Gonçalves / Isaías Saad (Mt 14)
+  "p4SX8gG38zg": ["fe", "vitoria"],                     // Cremos no Teu Poder — Sede Verbo da Vida
+  "d2OLS1RkGF4": ["fe", "vitoria"],                     // Cremos no Teu Poder (Ao Vivo) — Emylie Rodrigues
+  "WlR8o3D0V5c": ["entrega", "intimidade"],             // Bom Perfume — Sede Verbo da Vida (Maria de Betânia)
+  "Npsfmz5PrvA": ["amor", "graca"],                     // Teu Amor Não Falha — Templo Soul
+  "vcX5ljPzIdw": ["vitoria", "fe"],                     // Fortaleza — Ana Ticianeli
+  "YuBmD6BmAs0": ["intimidade", "entrega"],             // Satisfaz — André Martins
+
+  "_VJgJx1FM0A": ["fe", "vitoria"],                     // Este é o Dia — Euller Oliveira
+  "wK2uxXMJ4a4": ["vitoria", "alegria"],                // Minha Vitória — Eliezer Rodrigues
+  "KO5qvwujwVg": ["amor", "vitoria"],                   // O Seu Amor — Manassés Guerra & Cinthya Miranda
+  "g0vwsqmq_3U": ["esperanca", "fe"],                   // Só Vai Melhorar — Eliezer Rodrigues
+  "bOPsqICVi9Q": ["soberania", "ressurreicao"],         // Rei da Glória — Israel Salazar
+  "gOnp0Kuq-9M": ["entrega", "espirito"],               // Altar — Brasa Church Music / Liz Johnson
+  "dehE3ISeWNo": ["ressurreicao", "vitoria"],           // Venceu — Nívea Soares
+  "p7Gy9m7LEZg": ["ressurreicao", "graca", "alegria"],  // Canção dos Redimidos — Julia Vitoria & Nívea Soares
+  "dfmjN09kaX4": ["santidade", "gratidao"],             // Grande É o Senhor (Great Are You Lord)
+  "dAbMgyF5d2c": ["esperanca", "fe"],                   // Deus Está Fazendo Algo Grande — Ana Ticianeli
 };
