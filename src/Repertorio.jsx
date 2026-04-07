@@ -175,13 +175,14 @@ const S = {
   temaChip: { padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--chip-bg)", color: "var(--chip-text)", fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", fontWeight: 600 },
 
   // Song cards
-  songsGrid: { display: "grid", gap: 10 },
+  songsGrid: { display: "grid", gap: 10, gridTemplateColumns: "minmax(0, 1fr)" },
   card: {
     display: "flex", alignItems: "center", gap: 14, padding: 12,
     borderRadius: 18, cursor: "pointer", transition: "all .2s ease",
     background: "var(--surface)", border: "1px solid var(--border)",
     backdropFilter: "blur(var(--blur))", WebkitBackdropFilter: "blur(var(--blur))",
     boxShadow: "var(--shadow-sm)",
+    minWidth: 0, maxWidth: "100%", overflow: "hidden",
   },
   cardVerbo: { borderLeft: "3px solid var(--verbo)" },
   cardSelected: { border: "1px solid var(--accent-border)", background: "var(--accent-soft)", boxShadow: "0 8px 24px rgba(16,185,129,0.18)" },
