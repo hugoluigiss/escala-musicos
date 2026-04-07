@@ -326,6 +326,11 @@ export default function Repertorio() {
   const [savingFlash, setSavingFlash] = useState(false);
   const [showPessoas, setShowPessoas] = useState(false);
   const [showAddSong, setShowAddSong] = useState(false);
+  // Histórico de repertórios (admin only)
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [expandedHistory, setExpandedHistory] = useState({}); // { id: bool }
 
   // ── Load overrides from API on mount ──
   useEffect(() => {
@@ -711,6 +716,34 @@ export default function Repertorio() {
     }
   }
 
+  // Abre o histórico de repertórios e carrega da API
+  async function openHistory() {
+    setShowHistory(true);
+    setLoadingHistory(true);
+    try {
+      const cur = await apiGet("repertorio_history");
+      setHistory(Array.isArray(cur) ? cur : []);
+    } catch (e) {
+      console.error("Failed to load history", e);
+      setHistory([]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }
+
+  function formatBrDateTime(iso) {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mi = String(d.getMinutes()).padStart(2, "0");
+      return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+    } catch { return iso; }
+  }
+
   function formatBrDate(iso) {
     if (!iso) return "";
     const [y, m, d] = iso.split("-");
@@ -813,6 +846,16 @@ export default function Repertorio() {
               title="Gerenciar lista de cantores"
             >
               ⚙ Cantores
+            </button>
+          )}
+          {admin && (
+            <button
+              type="button"
+              onClick={openHistory}
+              style={{...S.stat, cursor: "pointer", fontFamily: "inherit"}}
+              title="Ver histórico de repertórios criados"
+            >
+              📜 Histórico
             </button>
           )}
         </div>
@@ -1069,6 +1112,154 @@ export default function Repertorio() {
           onSave={handleAddSong}
           onClose={() => setShowAddSong(false)}
         />
+      )}
+
+      {/* HISTORY MODAL — admin only */}
+      {showHistory && admin && (
+        <div style={S.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget) setShowHistory(false); }}>
+          <div className="v-scale" style={{ width: "100%", maxWidth: 720 }}>
+            <div style={S.modal}>
+              <div style={{ padding: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <div style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text)" }}>📜 Histórico de Repertórios</div>
+                  <button
+                    type="button"
+                    onClick={() => setShowHistory(false)}
+                    style={{
+                      width: 32, height: 32, borderRadius: 10,
+                      border: "1px solid var(--border-strong)",
+                      background: "var(--input-bg)", color: "var(--text-muted)",
+                      fontSize: "1.1rem", cursor: "pointer", fontFamily: "inherit",
+                    }}
+                    title="Fechar"
+                  >×</button>
+                </div>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 16 }}>
+                  Todos os repertórios criados, do mais recente para o mais antigo.
+                </div>
+
+                {loadingHistory ? (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--text-faint)", fontSize: "0.9rem" }}>
+                    Carregando...
+                  </div>
+                ) : history.length === 0 ? (
+                  <div style={{
+                    padding: "40px 20px", textAlign: "center",
+                    color: "var(--text-faint)", fontSize: "0.9rem", fontStyle: "italic",
+                    background: "var(--chip-bg)", borderRadius: 14,
+                    border: "1px dashed var(--border-strong)",
+                  }}>
+                    Nenhum repertório no histórico ainda.<br/>
+                    Crie um repertório e ele aparecerá aqui.
+                  </div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12, maxHeight: "60vh", overflowY: "auto", paddingRight: 4 }}>
+                    {history.map(entry => {
+                      const isOpen = !!expandedHistory[entry.id];
+                      const tipoLabel = entry.type === "evento"
+                        ? (entry.eventName ? `🎉 ${entry.eventName}` : "🎉 Evento Especial")
+                        : "⛪ Culto de Domingo";
+                      return (
+                        <div key={entry.id} style={{
+                          background: "var(--chip-bg)",
+                          border: "1px solid var(--border)",
+                          borderRadius: 14,
+                          overflow: "hidden",
+                        }}>
+                          <div
+                            onClick={() => setExpandedHistory(p => ({ ...p, [entry.id]: !p[entry.id] }))}
+                            style={{ padding: 14, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+                          >
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: "0.92rem", fontWeight: 800, color: "var(--text)", marginBottom: 4 }}>
+                                {formatBrDate(entry.date)} · {tipoLabel}
+                              </div>
+                              <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", display: "flex", flexWrap: "wrap", gap: 10 }}>
+                                <span>✍ {entry.createdBy || "—"}</span>
+                                <span>🎵 {(entry.songs || []).length} música{(entry.songs || []).length === 1 ? "" : "s"}</span>
+                                <span style={{ color: "var(--text-faint)" }}>Salvo em {formatBrDateTime(entry.createdAt)}</span>
+                              </div>
+                            </div>
+                            <span style={{ color: "var(--text-faint)", fontSize: "0.9rem", flexShrink: 0 }}>
+                              {isOpen ? "▴" : "▾"}
+                            </span>
+                          </div>
+                          {isOpen && (
+                            <div style={{
+                              padding: "0 14px 14px",
+                              borderTop: "1px solid var(--border)",
+                              display: "flex", flexDirection: "column", gap: 10, paddingTop: 12,
+                            }}>
+                              {(entry.songs || []).map((sg, i) => {
+                                // Pega temas atualizados (ou da própria entrada, se existir)
+                                const raw = findRawSong(sg.videoId);
+                                const temas = raw ? getEffectiveTemas(raw).map(tid => TEMAS_DEF[tid]?.label).filter(Boolean) : [];
+                                return (
+                                  <div key={i} style={{
+                                    background: "var(--menu-bg)",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: 10,
+                                    padding: 12,
+                                  }}>
+                                    <div style={{ fontSize: "0.86rem", fontWeight: 700, color: "var(--text)", marginBottom: 2 }}>
+                                      {i+1}. {sg.musica}{sg.verbo ? " ⭐" : ""}
+                                    </div>
+                                    <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginBottom: 6 }}>
+                                      🎤 {sg.artista}
+                                    </div>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, fontSize: "0.74rem" }}>
+                                      {sg.lead && (
+                                        <span style={{
+                                          padding: "3px 9px", borderRadius: 999,
+                                          background: "var(--accent-soft)",
+                                          color: "var(--accent-text)",
+                                          border: "1px solid var(--accent-border)",
+                                          fontWeight: 700,
+                                        }}>🎙 {sg.lead}</span>
+                                      )}
+                                      {sg.tom && (
+                                        <span style={{
+                                          padding: "3px 9px", borderRadius: 999,
+                                          background: "var(--chip-bg)",
+                                          color: "var(--text-muted)",
+                                          border: "1px solid var(--border)",
+                                          fontWeight: 700,
+                                        }}>🎼 {sg.tom}</span>
+                                      )}
+                                      {temas.map(tl => (
+                                        <span key={tl} style={{
+                                          padding: "3px 9px", borderRadius: 999,
+                                          background: "var(--chip-bg)",
+                                          color: "var(--text-faint)",
+                                          border: "1px solid var(--border)",
+                                        }}>{tl}</span>
+                                      ))}
+                                      {sg.videoId && (
+                                        <a href={`https://youtu.be/${sg.videoId}`} target="_blank" rel="noopener noreferrer"
+                                          style={{
+                                            padding: "3px 9px", borderRadius: 999,
+                                            background: "var(--chip-bg)",
+                                            color: "var(--accent-text)",
+                                            border: "1px solid var(--border)",
+                                            textDecoration: "none",
+                                            fontWeight: 700,
+                                          }}>▶ YouTube</a>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* CONFIRM MODAL — pick lead + tom for each of the 4 selected songs */}
