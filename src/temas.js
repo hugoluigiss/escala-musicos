@@ -102,4 +102,5 @@ export const TEMAS = {
   "p7Gy9m7LEZg": ["ressurreicao", "graca", "alegria"],  // Canção dos Redimidos — Julia Vitoria & Nívea Soares
   "dfmjN09kaX4": ["santidade", "gratidao"],             // Grande É o Senhor (Great Are You Lord)
   "dAbMgyF5d2c": ["esperanca", "fe"],                   // Deus Está Fazendo Algo Grande — Ana Ticianeli
+  "PbcSnNw9NnA": ["nome", "cura", "vitoria"],           // Falo Jesus (I Speak Jesus) — Verbo Music feat. Josias Goulart
 };

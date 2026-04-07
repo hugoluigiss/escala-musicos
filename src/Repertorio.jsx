@@ -77,6 +77,7 @@ const SONGS=[
 {num:68,musica:"Canção dos Redimidos (Ao Vivo)",artista:"Julia Vitoria e Nívea Soares",tom:"-",indicadaPor:"",verbo:false,videoId:"p7Gy9m7LEZg"},
 {num:69,musica:"Grande É o Senhor (Great Are You Lord)",artista:"Thiago Henrique & Matheus França",tom:"-",indicadaPor:"",verbo:false,videoId:"dfmjN09kaX4"},
 {num:70,musica:"Deus Está Fazendo Algo Grande",artista:"Ana Ticianeli",tom:"-",indicadaPor:"",verbo:false,videoId:"dAbMgyF5d2c"},
+{num:71,musica:"Falo Jesus (I Speak Jesus)",artista:"Verbo Music feat. Josias Goulart",tom:"-",indicadaPor:"",verbo:true,videoId:"PbcSnNw9NnA"},
 ];
 
 const thumb = (id) => id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : "";
