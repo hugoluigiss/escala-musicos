@@ -215,11 +215,11 @@ const S = {
   badgeTema: { },
 
   check: {
-    width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+    width: 36, height: 36, borderRadius: 10, flexShrink: 0,
     display: "flex", alignItems: "center", justifyContent: "center",
-    fontSize: 14, fontWeight: 800, cursor: "pointer",
+    fontSize: 20, fontWeight: 800, cursor: "pointer",
     background: "var(--surface-faint)", border: "1.5px solid var(--border-strong)",
-    color: "transparent", transition: "all .15s",
+    color: "var(--text-muted)", transition: "all .15s",
   },
   checkSel: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", borderColor: "var(--accent-strong)", color: "#fff", boxShadow: "0 4px 12px rgba(16,185,129,0.40)" },
 
@@ -1015,7 +1015,7 @@ export default function Repertorio() {
                     })}
                   </div>
                 </div>
-                <div style={checkStyle} onClick={(e) => { e.stopPropagation(); toggle(s.num); }} title={isSel ? "Remover" : "Adicionar"}>
+                <div style={checkStyle} className="song-check" onClick={(e) => { e.stopPropagation(); toggle(s.num); }} title={isSel ? "Remover" : "Adicionar"}>
                   {isSel ? "✓" : "+"}
                 </div>
               </div>

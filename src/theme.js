@@ -130,6 +130,7 @@ const CSS = `
     .admin-btn-sm { padding: 6px 10px !important; font-size: 0.72rem !important; }
     .song-card { gap: 10px !important; padding: 10px !important; }
     .song-thumb { width: 64px !important; height: 48px !important; }
+    .song-check { width: 34px !important; height: 34px !important; font-size: 18px !important; }
     .song-title { font-size: 0.88rem !important; }
     .song-artist { font-size: 0.74rem !important; }
     .bottom-dock { padding: 10px 12px 14px !important; }
