@@ -40,6 +40,7 @@ const M = {
   actions: { display: "flex", gap: 8, marginTop: 24 },
   btnSave: { flex: 1, padding: "12px 16px", borderRadius: 12, border: "none", background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", color: "#fff", fontWeight: 800, fontSize: "0.9rem", cursor: "pointer", fontFamily: "inherit", boxShadow: "0 6px 16px rgba(16,185,129,0.30)" },
   btnCancel: { padding: "12px 16px", borderRadius: 12, border: "1px solid var(--border-strong)", background: "transparent", color: "var(--text-muted)", fontWeight: 600, fontSize: "0.88rem", cursor: "pointer", fontFamily: "inherit" },
+  btnDelete: { padding: "12px 16px", borderRadius: 12, border: "1px solid rgba(239,68,68,0.30)", background: "rgba(239,68,68,0.10)", color: "var(--danger)", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", fontFamily: "inherit" },
   err: { background: "rgba(239,68,68,0.10)", border: "1px solid rgba(239,68,68,0.30)", color: "var(--danger)", padding: "10px 12px", borderRadius: 12, fontSize: "0.78rem", marginTop: 12 },
 
   // PersonPicker
@@ -254,7 +255,7 @@ export function PessoasModal({ open, pessoas: initial, onSave, onClose }) {
 //        onSave({temas, override, keys}), onClose
 // NOTE: pessoas management was moved to PessoasModal. Here `pessoas` is only
 // consumed as the source list for the PersonPicker dropdowns.
-export function EditSongModal({ song, currentTemas, currentOverride, currentKeys, pessoas, onSave, onClose }) {
+export function EditSongModal({ song, currentTemas, currentOverride, currentKeys, pessoas, onSave, onDelete, onClose }) {
   const [temas, setTemas] = useState(currentTemas || []);
   const [musica, setMusica] = useState((currentOverride?.musica) ?? song.musica ?? "");
   const [artista, setArtista] = useState((currentOverride?.artista) ?? song.artista ?? "");
@@ -281,6 +282,21 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
     setKeys(prev => prev.map((k, idx) => idx === i ? { ...k, [field]: val } : k));
   }
   function removeKey(i) { setKeys(prev => prev.filter((_, idx) => idx !== i)); }
+
+  async function doDelete() {
+    if (!onDelete) return;
+    const ok = typeof window !== "undefined" && window.confirm
+      ? window.confirm(`Tem certeza que deseja excluir "${song.musica}"?\n\nEssa ação remove a música do repertório.`)
+      : true;
+    if (!ok) return;
+    setErr(""); setSaving(true);
+    try {
+      await onDelete(song);
+      onClose();
+    } catch (ex) {
+      setErr("Erro ao excluir: " + ex.message);
+    } finally { setSaving(false); }
+  }
 
   async function save() {
     setErr(""); setSaving(true);
@@ -392,9 +408,128 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
         {err && <div style={M.err}>{err}</div>}
 
         <div style={M.actions}>
+          {onDelete && (
+            <button type="button" disabled={saving} onClick={doDelete} style={M.btnDelete} title="Excluir música">
+              🗑 Excluir
+            </button>
+          )}
           <button type="button" onClick={onClose} style={M.btnCancel}>Cancelar</button>
           <button type="button" disabled={saving} onClick={save} style={{...M.btnSave, opacity: saving ? 0.6 : 1}}>
             {saving ? "Salvando..." : "💾 Salvar"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Add Song Modal ────────────────────────────────────────────────────────
+// Minimal form to add a new custom song. The parent is responsible for
+// allocating a `num` and persisting it.
+export function AddSongModal({ open, pessoas, existingVideoIds, onSave, onClose }) {
+  const [url, setUrl] = useState("");
+  const [musica, setMusica] = useState("");
+  const [artista, setArtista] = useState("");
+  const [verbo, setVerbo] = useState(false);
+  const [indicadaPor, setIndicadaPor] = useState("");
+  const [tom, setTom] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (open) {
+      setUrl(""); setMusica(""); setArtista(""); setVerbo(false);
+      setIndicadaPor(""); setTom(""); setErr(""); setSaving(false);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  function extractVideoId(u) {
+    if (!u) return "";
+    const s = u.trim();
+    const m = s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([\w-]{11})/);
+    if (m) return m[1];
+    if (/^[\w-]{11}$/.test(s)) return s;
+    return "";
+  }
+
+  async function save() {
+    setErr(""); setSaving(true);
+    try {
+      const videoId = extractVideoId(url);
+      if (!videoId) throw new Error("URL do YouTube inválida. Cole o link completo.");
+      if (!musica.trim()) throw new Error("Nome da música é obrigatório.");
+      if ((existingVideoIds || []).includes(videoId)) {
+        throw new Error("Essa música já está no repertório.");
+      }
+      await onSave({
+        videoId,
+        musica: musica.trim(),
+        artista: artista.trim(),
+        tom: tom.trim() || "-",
+        indicadaPor: (indicadaPor || "").trim(),
+        verbo: !!verbo,
+      });
+      onClose();
+    } catch (ex) {
+      setErr(ex.message);
+    } finally { setSaving(false); }
+  }
+
+  return (
+    <div style={M.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="v-scale" style={M.modal}>
+        <div style={M.title}>➕ Nova música</div>
+        <div style={M.sub}>Adicione uma música ao repertório a partir de um link do YouTube.</div>
+
+        <div style={M.label}>URL do YouTube</div>
+        <input
+          style={M.input}
+          value={url}
+          onChange={e => setUrl(e.target.value)}
+          placeholder="https://www.youtube.com/watch?v=..."
+          autoFocus
+        />
+        <div style={M.hint}>Cole o link completo do vídeo ou só o ID (11 caracteres).</div>
+
+        <div style={M.label}>Nome da música</div>
+        <input style={M.input} value={musica} onChange={e => setMusica(e.target.value)} placeholder="Título da música" />
+
+        <div style={M.label}>Artista</div>
+        <input style={M.input} value={artista} onChange={e => setArtista(e.target.value)} placeholder="Nome do artista / banda" />
+
+        <div style={M.label}>Tags</div>
+        <div style={M.chipsRow}>
+          <button
+            type="button"
+            onClick={() => setVerbo(v => !v)}
+            style={verbo
+              ? { padding: "6px 12px", borderRadius: 999, border: "1px solid var(--verbo-border)", background: "var(--verbo-soft)", color: "var(--verbo-text)", fontSize: "0.72rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 800 }
+              : M.chip
+            }
+          >
+            ⭐ Verbo da Vida
+          </button>
+        </div>
+
+        <div style={M.label}>Indicada por</div>
+        <PersonPicker
+          value={indicadaPor}
+          pessoas={pessoas}
+          placeholder="Selecione quem indicou (opcional)"
+          onChange={setIndicadaPor}
+        />
+
+        <div style={M.label}>Tom geral</div>
+        <input style={M.input} value={tom} onChange={e => setTom(e.target.value)} placeholder="Ex: G, Bb, F#m, ou - se não definido" />
+
+        {err && <div style={M.err}>{err}</div>}
+
+        <div style={M.actions}>
+          <button type="button" onClick={onClose} style={M.btnCancel}>Cancelar</button>
+          <button type="button" disabled={saving} onClick={save} style={{...M.btnSave, opacity: saving ? 0.6 : 1}}>
+            {saving ? "Adicionando..." : "➕ Adicionar"}
           </button>
         </div>
       </div>

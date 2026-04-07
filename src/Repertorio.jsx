@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { TEMAS, TEMAS_DEF } from "./temas.js";
 import { apiGet, apiPut, isAdmin as checkIsAdmin } from "./api.js";
-import { EditSongModal, PessoasModal } from "./AdminEdit.jsx";
+import { EditSongModal, PessoasModal, AddSongModal } from "./AdminEdit.jsx";
 import SiteHeader from "./SiteHeader.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
@@ -130,11 +130,11 @@ const S = {
   searchIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)", fontSize: 18 },
 
   filtersTitle: { fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 },
-  filters: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 10, scrollbarWidth: "thin" },
+  filters: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 },
   filterBtn: { padding: "7px 14px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--chip-bg)", color: "var(--chip-text)", fontSize: "0.78rem", cursor: "pointer", whiteSpace: "nowrap", fontWeight: 600, transition: "all .15s" },
   filterActive: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", border: "1px solid var(--accent-border)", color: "#fff", boxShadow: "0 4px 12px rgba(16,185,129,0.30)" },
   filterVerbo: { background: "var(--verbo-soft)", border: "1px solid var(--verbo-border)", color: "var(--verbo-text)" },
-  temaRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 },
+  temaRow: { display: "flex", flexWrap: "wrap", gap: 6 },
   temaChip: { padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--chip-bg)", color: "var(--chip-text)", fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", fontWeight: 600 },
 
   // Song cards
@@ -295,24 +295,31 @@ export default function Repertorio() {
   const [temasOver, setTemasOver] = useState({});  // { videoId: [tagId, ...] }
   const [songKeys, setSongKeys] = useState({});    // { videoId: [{cantor, tom}, ...] }
   const [pessoas, setPessoas] = useState([]);      // string[]
+  const [deletedSongs, setDeletedSongs] = useState([]);  // string[] of videoIds
+  const [customSongs, setCustomSongs] = useState([]);    // custom song objects
   const [savingFlash, setSavingFlash] = useState(false);
   const [showPessoas, setShowPessoas] = useState(false);
+  const [showAddSong, setShowAddSong] = useState(false);
 
   // ── Load overrides from API on mount ──
   useEffect(() => {
     let cancelled = false;
     async function load() {
       try {
-        const [ov, to, sk, pe] = await Promise.all([
+        const [ov, to, sk, pe, del, cus] = await Promise.all([
           apiGet("repertorio_overrides"),
           apiGet("repertorio_temas"),
           apiGet("song_keys"),
           apiGet("pessoas_repertorio"),
+          apiGet("repertorio_deleted"),
+          apiGet("repertorio_custom_songs"),
         ]);
         if (cancelled) return;
         if (ov && typeof ov === "object") setOverrides(ov);
         if (to && typeof to === "object") setTemasOver(to);
         if (sk && typeof sk === "object") setSongKeys(sk);
+        if (del && Array.isArray(del)) setDeletedSongs(del);
+        if (cus && Array.isArray(cus)) setCustomSongs(cus);
         if (pe && Array.isArray(pe) && pe.length > 0) setPessoas(pe);
         else {
           // Seed: combina nomes do indicadaPor (base + overrides) com a banda
@@ -347,8 +354,17 @@ export default function Repertorio() {
   function getKeysFor(s) {
     return songKeys[s.videoId] || [];
   }
+  // Lookup the raw (pre-override) song by videoId across base + custom lists.
+  function findRawSong(vid) {
+    return SONGS.find(s => s.videoId === vid) || customSongs.find(s => s.videoId === vid);
+  }
 
-  const effectiveSongs = SONGS.map(getEffectiveSong);
+  // Base songs minus deleted, plus admin-created custom songs.
+  const allSongs = [
+    ...SONGS.filter(s => !deletedSongs.includes(s.videoId)),
+    ...customSongs,
+  ];
+  const effectiveSongs = allSongs.map(getEffectiveSong);
 
   const hasVerbo = selected.some(s => s.verbo);
   const canGenerate = selected.length === 4 && hasVerbo;
@@ -367,7 +383,7 @@ export default function Repertorio() {
   async function handleSaveEdit(payload) {
     const { temas: newTemas, override, keys } = payload;
     const vid = editing.videoId;
-    const baseSong = SONGS.find(s => s.videoId === vid) || editing;
+    const baseSong = findRawSong(vid) || editing;
 
     const nextOv = { ...overrides };
     const trimmedMusica = (override.musica || "").trim();
@@ -402,8 +418,54 @@ export default function Repertorio() {
       setTemasOver(nextTemas);
       setSongKeys(nextKeys);
       if (detail && detail.videoId === vid) {
-        setDetail(getEffectiveSong(SONGS.find(s => s.videoId === vid)));
+        const raw = findRawSong(vid);
+        if (raw) setDetail(getEffectiveSong(raw));
       }
+    } finally { setSavingFlash(false); }
+  }
+
+  // ── Add new custom song ─────────────────────────────────────────────
+  async function handleAddSong(data) {
+    const allNums = [...SONGS.map(s => s.num), ...customSongs.map(s => s.num)];
+    const nextNum = (allNums.length ? Math.max(...allNums) : 0) + 1;
+    const newSong = {
+      num: nextNum,
+      musica: data.musica,
+      artista: data.artista,
+      tom: data.tom || "-",
+      indicadaPor: data.indicadaPor || "",
+      verbo: !!data.verbo,
+      videoId: data.videoId,
+    };
+    const nextCustom = [...customSongs, newSong];
+    setSavingFlash(true);
+    try {
+      await apiPut("repertorio_custom_songs", nextCustom);
+      setCustomSongs(nextCustom);
+    } finally { setSavingFlash(false); }
+  }
+
+  // ── Delete song (base or custom) ────────────────────────────────────
+  async function handleDeleteSong(song) {
+    const vid = song.videoId;
+    const isCustom = customSongs.some(c => c.videoId === vid);
+    setSavingFlash(true);
+    try {
+      if (isCustom) {
+        const nextCustom = customSongs.filter(c => c.videoId !== vid);
+        await apiPut("repertorio_custom_songs", nextCustom);
+        setCustomSongs(nextCustom);
+      } else {
+        if (!deletedSongs.includes(vid)) {
+          const nextDel = [...deletedSongs, vid];
+          await apiPut("repertorio_deleted", nextDel);
+          setDeletedSongs(nextDel);
+        }
+      }
+      // Clean up traces and close any open views
+      setSelected(sel => sel.filter(s => s.videoId !== vid));
+      if (detail && detail.videoId === vid) setDetail(null);
+      if (editing && editing.videoId === vid) setEditing(null);
     } finally { setSavingFlash(false); }
   }
 
@@ -454,8 +516,8 @@ export default function Repertorio() {
       setOverrides(nextOv);
       setSongKeys(nextKeys);
       if (detail) {
-        const refreshed = getEffectiveSong(SONGS.find(s => s.videoId === detail.videoId));
-        if (refreshed) setDetail(refreshed);
+        const raw = findRawSong(detail.videoId);
+        if (raw) setDetail(getEffectiveSong(raw));
       }
     } finally { setSavingFlash(false); }
   }
@@ -484,8 +546,8 @@ export default function Repertorio() {
       setSelected(selected.filter(s => s.num !== num));
     } else {
       if (selected.length >= 4) return;
-      const base = SONGS.find(s => s.num === num);
-      setSelected([...selected, getEffectiveSong(base)]);
+      const base = allSongs.find(s => s.num === num);
+      if (base) setSelected([...selected, getEffectiveSong(base)]);
     }
   }
 
@@ -545,6 +607,16 @@ export default function Repertorio() {
           <span style={S.stat}><b>{SONGS.length}</b> &nbsp;músicas</span>
           <span style={{...S.stat,...S.statVerbo}}>⭐ <b>{SONGS.filter(s=>s.verbo).length}</b> &nbsp;Verbo da Vida</span>
           {admin && <span style={{...S.stat,...S.statAdmin}}>✓ Admin{savingFlash ? " ⏳" : ""}</span>}
+          {admin && (
+            <button
+              type="button"
+              onClick={() => setShowAddSong(true)}
+              style={{...S.stat, ...S.statAdmin, cursor: "pointer", fontFamily: "inherit", fontWeight: 700}}
+              title="Adicionar nova música"
+            >
+              ➕ Nova música
+            </button>
+          )}
           {admin && (
             <button
               type="button"
@@ -759,8 +831,8 @@ export default function Repertorio() {
         </div>
       )}
 
-      {/* EDIT MODAL */}
-      {editing && (
+      {/* EDIT MODAL — admin only */}
+      {editing && admin && (
         <EditSongModal
           song={editing}
           currentTemas={getEffectiveTemas(editing)}
@@ -768,17 +840,31 @@ export default function Repertorio() {
           currentKeys={getKeysFor(editing)}
           pessoas={pessoas}
           onSave={handleSaveEdit}
+          onDelete={handleDeleteSong}
           onClose={() => setEditing(null)}
         />
       )}
 
       {/* PESSOAS MODAL (admin singer list) */}
-      <PessoasModal
-        open={showPessoas}
-        pessoas={pessoas}
-        onSave={handleSavePessoas}
-        onClose={() => setShowPessoas(false)}
-      />
+      {admin && (
+        <PessoasModal
+          open={showPessoas}
+          pessoas={pessoas}
+          onSave={handleSavePessoas}
+          onClose={() => setShowPessoas(false)}
+        />
+      )}
+
+      {/* ADD SONG MODAL (admin) */}
+      {admin && (
+        <AddSongModal
+          open={showAddSong}
+          pessoas={pessoas}
+          existingVideoIds={allSongs.map(s => s.videoId)}
+          onSave={handleAddSong}
+          onClose={() => setShowAddSong(false)}
+        />
+      )}
 
       {/* OUTPUT MODAL */}
       {showOutput && (
