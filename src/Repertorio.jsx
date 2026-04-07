@@ -462,8 +462,11 @@ export default function Repertorio() {
 
   const filtered = effectiveSongs.filter(s => {
     if (filter === "verbo" && !s.verbo) return false;
-    if (filter === "other" && s.verbo) return false;
-    if (["matheus","jokasta","madalena","aline"].includes(filter) && !(s.indicadaPor || "").toLowerCase().includes(filter)) return false;
+    if (filter === "none" && (s.indicadaPor || "").trim() !== "") return false;
+    if (filter.startsWith("p:")) {
+      const who = filter.slice(2);
+      if ((s.indicadaPor || "").trim() !== who) return false;
+    }
     if (tema !== "all") {
       const songTemas = getEffectiveTemas(s);
       if (!songTemas.includes(tema)) return false;
@@ -513,9 +516,18 @@ export default function Repertorio() {
     });
   }
 
+  // Lista dinâmica de cantores: inclui todos que aparecem em alguma música
+  // (indicadaPor) e também os cadastrados no painel de Cantores.
+  const indicadosDasMusicas = Array.from(new Set(
+    effectiveSongs.map(s => (s.indicadaPor || "").trim()).filter(Boolean)
+  ));
+  const cantoresFiltro = Array.from(new Set([...indicadosDasMusicas, ...(pessoas || [])])).sort();
+
   const filters = [
-    { id: "all", label: "Todas" }, { id: "verbo", label: "⭐ Verbo da Vida" }, { id: "other", label: "Outras" },
-    { id: "matheus", label: "Matheus" }, { id: "jokasta", label: "Jokasta" }, { id: "madalena", label: "Madalena" }, { id: "aline", label: "Aline" },
+    { id: "all", label: "Todas" },
+    { id: "verbo", label: "⭐ Verbo da Vida" },
+    { id: "none", label: "Sem indicação" },
+    ...cantoresFiltro.map(nome => ({ id: `p:${nome}`, label: nome })),
   ];
 
   const slotMsgs = ["Toque para adicionar", "2ª música", "3ª música", "4ª música"];
