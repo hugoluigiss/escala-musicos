@@ -69,7 +69,7 @@ const SONGS=[
 {num:65,musica:"Só Vai Melhorar",artista:"-",tom:"-",indicadaPor:"",verbo:false,videoId:"g0vwsqmq_3U"},
 {num:66,musica:"Rei da Glória",artista:"Israel Salazar",tom:"A",indicadaPor:"Leandro",verbo:false,videoId:"bOPsqICVi9Q"},
 {num:67,musica:"Altar",artista:"Brasa Church Music / Liz Johnson",tom:"A",indicadaPor:"Aline Magalhães",verbo:false,videoId:"gOnp0Kuq-9M"},
-{num:68,musica:"Redimido",artista:"Nívea Soares",tom:"G",indicadaPor:"Madalena",verbo:false,videoId:"dehE3ISeWNo"},
+{num:68,musica:"Venceu",artista:"Nívea Soares",tom:"G",indicadaPor:"Madalena",verbo:false,videoId:"dehE3ISeWNo"},
 ];
 
 const thumb = (id) => id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : "";
