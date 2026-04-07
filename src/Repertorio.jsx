@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { LETRAS } from "./letras.js";
 import { TEMAS, TEMAS_DEF } from "./temas.js";
 import { apiGet, apiPut, isAdmin as checkIsAdmin } from "./api.js";
-import { EditSongModal } from "./AdminEdit.jsx";
+import { EditSongModal, PessoasModal } from "./AdminEdit.jsx";
 import SiteHeader from "./SiteHeader.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
@@ -87,6 +86,10 @@ const ytEmbed = (id) => id ? `https://www.youtube.com/embed/${id}?rel=0&modestbr
 const cifraClubLink = (musica, artista) => {
   const q = encodeURIComponent(`${musica || ""} ${artista || ""}`.trim());
   return `https://www.cifraclub.com.br/?q=${q}`;
+};
+const letrasLink = (musica, artista) => {
+  const q = encodeURIComponent(`${musica || ""} ${artista || ""}`.trim());
+  return `https://www.letras.mus.br/?q=${q}`;
 };
 
 // Lista oficial dos músicos da banda — nomes corretos (com sobrenome).
@@ -293,6 +296,7 @@ export default function Repertorio() {
   const [songKeys, setSongKeys] = useState({});    // { videoId: [{cantor, tom}, ...] }
   const [pessoas, setPessoas] = useState([]);      // string[]
   const [savingFlash, setSavingFlash] = useState(false);
+  const [showPessoas, setShowPessoas] = useState(false);
 
   // ── Load overrides from API on mount ──
   useEffect(() => {
@@ -361,69 +365,69 @@ export default function Repertorio() {
   }, []);
 
   async function handleSaveEdit(payload) {
-    const { temas: newTemas, override, keys, pessoas: newPessoas, renames } = payload;
+    const { temas: newTemas, override, keys } = payload;
     const vid = editing.videoId;
     const baseSong = SONGS.find(s => s.videoId === vid) || editing;
 
-    // ── Cascata de renames ─────────────────────────────────────────────
-    // Quando o admin renomeia uma pessoa (ex: "Aline Magalhães" → "Aline
-    // Guimarães"), aplicamos a substituição em TODOS os overrides
-    // (indicadaPor) e em TODOS os tons por cantor (cantor) que apontam
-    // para o nome antigo. Também substituímos o nome antigo dentro do
-    // próprio campo indicadaPor/keys do payload atual.
-    const renameMap = renames && typeof renames === "object" ? renames : {};
-    const hasRenames = Object.keys(renameMap).length > 0;
-
-    function mapName(name) {
-      const t = (name || "").trim();
-      return renameMap[t] || t;
-    }
-
-    // Aplica renames nos overrides existentes (tudo menos o vid corrente
-    // — esse é tratado pelo cleanOv abaixo).
-    const renamedOverrides = {};
-    Object.entries(overrides).forEach(([k, ov]) => {
-      if (!ov) return;
-      const newOv = { ...ov };
-      if (newOv.indicadaPor !== undefined) newOv.indicadaPor = mapName(newOv.indicadaPor);
-      renamedOverrides[k] = newOv;
-    });
-    // Aplica renames nos songKeys (cantor de cada linha).
-    const renamedSongKeys = {};
-    Object.entries(songKeys).forEach(([k, arr]) => {
-      if (!Array.isArray(arr)) return;
-      renamedSongKeys[k] = arr.map(row => ({ ...row, cantor: mapName(row.cantor) }));
-    });
-
-    const nextOv = { ...renamedOverrides };
+    const nextOv = { ...overrides };
     const trimmedMusica = (override.musica || "").trim();
     const trimmedArtista = (override.artista || "").trim();
-    const trimmedIndicada = mapName(override.indicadaPor || "");
+    const trimmedIndicada = (override.indicadaPor || "").trim();
     const trimmedTom = (override.tom || "").trim();
     const cleanOv = {};
     if (trimmedMusica && trimmedMusica !== baseSong.musica) cleanOv.musica = trimmedMusica;
     if (trimmedArtista && trimmedArtista !== baseSong.artista) cleanOv.artista = trimmedArtista;
     if (!!override.verbo !== !!baseSong.verbo) cleanOv.verbo = !!override.verbo;
-    // Para indicadaPor: comparar contra base APÓS aplicar rename na base
-    // (o campo base pode conter o nome antigo — precisamos forçar o
-    // override para ele virar o novo).
-    const baseIndicada = mapName(baseSong.indicadaPor || "");
-    if (trimmedIndicada !== baseIndicada || (hasRenames && renameMap[(baseSong.indicadaPor || "").trim()])) {
-      cleanOv.indicadaPor = trimmedIndicada;
-    }
+    if (trimmedIndicada !== (baseSong.indicadaPor || "")) cleanOv.indicadaPor = trimmedIndicada;
     if (trimmedTom !== (baseSong.tom || "")) cleanOv.tom = trimmedTom;
-    if (Object.keys(cleanOv).length === 0) {
-      delete nextOv[vid];
-    } else {
-      nextOv[vid] = cleanOv;
-    }
+    if (Object.keys(cleanOv).length === 0) delete nextOv[vid];
+    else nextOv[vid] = cleanOv;
 
-    // Para QUALQUER música cuja base.indicadaPor combine com um nome
-    // renomeado, garantir que o override force o novo nome (mesmo que
-    // não tenha override antes).
+    const nextTemas = { ...temasOver };
+    if (Array.isArray(newTemas) && newTemas.length > 0) nextTemas[vid] = newTemas;
+    else delete nextTemas[vid];
+
+    const nextKeys = { ...songKeys };
+    if (Array.isArray(keys) && keys.length > 0) nextKeys[vid] = keys;
+    else delete nextKeys[vid];
+
+    setSavingFlash(true);
+    try {
+      await Promise.all([
+        apiPut("repertorio_overrides", nextOv),
+        apiPut("repertorio_temas", nextTemas),
+        apiPut("song_keys", nextKeys),
+      ]);
+      setOverrides(nextOv);
+      setTemasOver(nextTemas);
+      setSongKeys(nextKeys);
+      if (detail && detail.videoId === vid) {
+        setDetail(getEffectiveSong(SONGS.find(s => s.videoId === vid)));
+      }
+    } finally { setSavingFlash(false); }
+  }
+
+  // ── Save handler for PessoasModal ───────────────────────────────────
+  // When the admin renames/removes singers in the master list, we cascade
+  // the changes through all overrides (indicadaPor) and song keys (cantor).
+  async function handleSavePessoas(nextPessoas, renames) {
+    const renameMap = renames && typeof renames === "object" ? renames : {};
+    const hasRenames = Object.keys(renameMap).length > 0;
+    const mapName = (name) => {
+      const t = (name || "").trim();
+      return renameMap[t] || t;
+    };
+
+    const nextOv = {};
+    Object.entries(overrides).forEach(([k, ov]) => {
+      if (!ov) return;
+      const newOv = { ...ov };
+      if (newOv.indicadaPor !== undefined) newOv.indicadaPor = mapName(newOv.indicadaPor);
+      nextOv[k] = newOv;
+    });
+    // Force override for any base song whose indicadaPor was renamed.
     if (hasRenames) {
       SONGS.forEach(s => {
-        if (s.videoId === vid) return; // já tratado
         const baseName = (s.indicadaPor || "").trim();
         if (renameMap[baseName]) {
           const cur = nextOv[s.videoId] ? { ...nextOv[s.videoId] } : {};
@@ -433,31 +437,25 @@ export default function Repertorio() {
       });
     }
 
-    const nextTemas = { ...temasOver };
-    if (Array.isArray(newTemas) && newTemas.length > 0) nextTemas[vid] = newTemas;
-    else delete nextTemas[vid];
-    // Aplica renames também no array de keys do payload corrente.
-    const renamedCurrentKeys = (keys || []).map(k => ({ ...k, cantor: mapName(k.cantor) }));
-    const nextKeys = { ...renamedSongKeys };
-    if (renamedCurrentKeys.length > 0) nextKeys[vid] = renamedCurrentKeys;
-    else delete nextKeys[vid];
-    const nextPessoas = Array.isArray(newPessoas) ? newPessoas : pessoas;
+    const nextKeys = {};
+    Object.entries(songKeys).forEach(([k, arr]) => {
+      if (!Array.isArray(arr)) return;
+      nextKeys[k] = arr.map(row => ({ ...row, cantor: mapName(row.cantor) }));
+    });
 
     setSavingFlash(true);
     try {
       await Promise.all([
-        apiPut("repertorio_overrides", nextOv),
-        apiPut("repertorio_temas", nextTemas),
-        apiPut("song_keys", nextKeys),
         apiPut("pessoas_repertorio", nextPessoas),
+        apiPut("repertorio_overrides", nextOv),
+        apiPut("song_keys", nextKeys),
       ]);
-      setOverrides(nextOv);
-      setTemasOver(nextTemas);
-      setSongKeys(nextKeys);
       setPessoas(nextPessoas);
-      // refresh detail view if open
-      if (detail && detail.videoId === vid) {
-        setDetail(getEffectiveSong(SONGS.find(s => s.videoId === vid)));
+      setOverrides(nextOv);
+      setSongKeys(nextKeys);
+      if (detail) {
+        const refreshed = getEffectiveSong(SONGS.find(s => s.videoId === detail.videoId));
+        if (refreshed) setDetail(refreshed);
       }
     } finally { setSavingFlash(false); }
   }
@@ -535,6 +533,16 @@ export default function Repertorio() {
           <span style={S.stat}><b>{SONGS.length}</b> &nbsp;músicas</span>
           <span style={{...S.stat,...S.statVerbo}}>⭐ <b>{SONGS.filter(s=>s.verbo).length}</b> &nbsp;Verbo da Vida</span>
           {admin && <span style={{...S.stat,...S.statAdmin}}>✓ Admin{savingFlash ? " ⏳" : ""}</span>}
+          {admin && (
+            <button
+              type="button"
+              onClick={() => setShowPessoas(true)}
+              style={{...S.stat, cursor: "pointer", fontFamily: "inherit"}}
+              title="Gerenciar lista de cantores"
+            >
+              ⚙ Cantores
+            </button>
+          )}
         </div>
       </div>
 
@@ -695,6 +703,13 @@ export default function Repertorio() {
                     🎸 Cifra Club
                   </a>
                   <a
+                    href={letrasLink(detail.musica, detail.artista)}
+                    target="_blank" rel="noreferrer"
+                    style={{...S.actionBtn, ...S.actionSecondary}}
+                  >
+                    📜 Letra
+                  </a>
+                  <a
                     href={ytLink(detail.videoId)} target="_blank" rel="noreferrer"
                     style={{...S.actionBtn, ...S.actionRed}}
                   >
@@ -704,7 +719,7 @@ export default function Repertorio() {
                     onClick={() => {
                       navigator.clipboard.writeText(`${detail.musica} — ${detail.artista}\n${ytLink(detail.videoId)}`);
                     }}
-                    style={{...S.actionBtn, ...S.actionSecondary}}
+                    style={{...S.actionBtn, ...S.actionSecondary, gridColumn: "1 / -1"}}
                   >
                     📋 Copiar link
                   </button>
@@ -726,11 +741,6 @@ export default function Repertorio() {
                     </div>
                   </>
                 )}
-
-                <div style={S.sectionTitle}>📜 Letra</div>
-                {LETRAS[detail.videoId] && LETRAS[detail.videoId].trim()
-                  ? <div style={S.letraBox}>{LETRAS[detail.videoId]}</div>
-                  : <div style={S.letraEmpty}>Letra ainda não cadastrada</div>}
               </div>
             </div>
           </div>
@@ -749,6 +759,14 @@ export default function Repertorio() {
           onClose={() => setEditing(null)}
         />
       )}
+
+      {/* PESSOAS MODAL (admin singer list) */}
+      <PessoasModal
+        open={showPessoas}
+        pessoas={pessoas}
+        onSave={handleSavePessoas}
+        onClose={() => setShowPessoas(false)}
+      />
 
       {/* OUTPUT MODAL */}
       {showOutput && (
