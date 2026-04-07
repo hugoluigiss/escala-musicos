@@ -4,21 +4,11 @@ import EscalaMusicos from './EscalaMusicos.jsx'
 import Repertorio from './Repertorio.jsx'
 import SiteHeader from './SiteHeader.jsx'
 import { isAdmin, adminLogin } from './api.js'
+import { installTheme } from './theme.js'
 
-const style = document.createElement('style')
-style.textContent = `
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { background: #0d0b1e; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-  ::-webkit-scrollbar-thumb { background: rgba(201,169,110,0.3); border-radius: 3px; }
-`
-document.head.appendChild(style)
+installTheme();
 
 // ─── Admin Gate ────────────────────────────────────────────────────────────
-// A senha de admin é UNIFICADA: a mesma senha vale para a Escala e para a
-// edição do Repertório. O estado é persistido em localStorage via api.js
-// (chave admin_pw_v1) e também usado como header X-Admin-Password no PUT.
 function AdminGate({ children }) {
   const [auth, setAuth] = useState(isAdmin());
   const [code, setCode] = useState("");
@@ -55,11 +45,15 @@ function AdminGate({ children }) {
   return (
     <div>
       <SiteHeader current="escala" />
-      <div style={{ display:"flex",alignItems:"center",justifyContent:"center",minHeight:"calc(100vh - 60px)",background:"#0d0b1e",fontFamily:"'Inter','Segoe UI',sans-serif",padding:20 }}>
-        <form onSubmit={handleSubmit} style={{ background:"rgba(255,255,255,0.03)",border:"1px solid rgba(201,169,110,0.15)",borderRadius:16,padding:32,maxWidth:380,width:"100%",textAlign:"center" }}>
-          <div style={{ fontSize:40,marginBottom:12 }}>🔒</div>
-          <h2 style={{ color:"#e8e6f0",fontSize:"1.2rem",fontWeight:700,marginBottom:4 }}>Área Administrativa</h2>
-          <p style={{ color:"#7a7890",fontSize:"0.82rem",marginBottom:20 }}>Digite o código de acesso para gerenciar a escala</p>
+      <div style={{ display:"flex",alignItems:"center",justifyContent:"center",minHeight:"calc(100vh - 64px)",padding:24 }}>
+        <form
+          onSubmit={handleSubmit}
+          className="glass-strong v-scale"
+          style={{ borderRadius:22,padding:"36px 32px",maxWidth:380,width:"100%",textAlign:"center" }}
+        >
+          <div style={{ width:60,height:60,borderRadius:"50%",background:"var(--accent-soft)",border:"1px solid var(--accent-border)",display:"flex",alignItems:"center",justifyContent:"center",margin:"0 auto 16px",fontSize:26 }}>🔒</div>
+          <h2 style={{ color:"var(--text)",fontSize:"1.25rem",fontWeight:700,marginBottom:6 }}>Área Administrativa</h2>
+          <p style={{ color:"var(--text-muted)",fontSize:"0.85rem",marginBottom:22 }}>Digite o código de acesso para gerenciar a escala</p>
           <input
             type="password"
             value={code}
@@ -67,16 +61,21 @@ function AdminGate({ children }) {
             placeholder="Código de acesso"
             autoFocus
             style={{
-              width:"100%",padding:"12px 16px",background:"rgba(255,255,255,0.05)",border: error ? "1px solid #f87171" : "1px solid rgba(255,255,255,0.1)",
-              borderRadius:10,color:"#e8e6f0",fontSize:"1rem",outline:"none",fontFamily:"inherit",textAlign:"center",letterSpacing:2,marginBottom:12
+              width:"100%",padding:"13px 16px",background:"var(--input-bg)",
+              border: error ? "1px solid var(--danger)" : "1px solid var(--border-strong)",
+              borderRadius:12,color:"var(--text)",fontSize:"1rem",outline:"none",
+              textAlign:"center",letterSpacing:2,marginBottom:12,
             }}
           />
-          {error && <p style={{ color:"#f87171",fontSize:"0.78rem",marginBottom:8 }}>{error}</p>}
+          {error && <p style={{ color:"var(--danger)",fontSize:"0.78rem",marginBottom:8 }}>{error}</p>}
           <button type="submit" disabled={loading || !code} style={{
-            width:"100%",padding:12,borderRadius:10,border:"none",background:"linear-gradient(135deg,#e8a838,#c9a96e)",
-            color:"#1a1440",fontFamily:"inherit",fontSize:"0.9rem",fontWeight:700,cursor:"pointer",opacity: (loading||!code) ? 0.6 : 1
+            width:"100%",padding:13,borderRadius:12,border:"none",
+            background:"linear-gradient(135deg, var(--accent), var(--accent-strong))",
+            color:"#fff",fontSize:"0.92rem",fontWeight:700,cursor:"pointer",
+            opacity: (loading||!code) ? 0.55 : 1,
+            boxShadow:"0 6px 18px rgba(16,185,129,0.30)",
           }}>{loading ? "Entrando..." : "Entrar"}</button>
-          <a href="/repertorio" style={{ display:"block",marginTop:16,color:"#7a7890",fontSize:"0.78rem",textDecoration:"none" }}>
+          <a href="/repertorio" onClick={(e)=>{e.preventDefault();window.__navigate&&window.__navigate('/repertorio')}} style={{ display:"block",marginTop:18,color:"var(--text-muted)",fontSize:"0.8rem",textDecoration:"none" }}>
             ← Voltar ao Repertório
           </a>
         </form>

@@ -80,7 +80,13 @@ const SONGS=[
 ];
 
 const thumb = (id) => id ? `https://img.youtube.com/vi/${id}/mqdefault.jpg` : "";
+const thumbHQ = (id) => id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : "";
 const ytLink = (id) => id ? `https://youtu.be/${id}` : "";
+const ytEmbed = (id) => id ? `https://www.youtube.com/embed/${id}?rel=0&modestbranding=1` : "";
+const cifraClubLink = (musica, artista) => {
+  const q = encodeURIComponent(`${musica || ""} ${artista || ""}`.trim());
+  return `https://www.cifraclub.com.br/?q=${q}`;
+};
 
 // Lista oficial dos músicos da banda — nomes corretos (com sobrenome).
 // Usado como seed inicial da lista de pessoas do editor admin, para que
@@ -97,91 +103,175 @@ const BAND_MEMBERS = [
   "Ana",
 ];
 
-// ─── STYLES ─────────────────────────────────────────────────────────────────
+// ─── STYLES (themed via CSS vars from theme.js) ─────────────────────────
 const S = {
-  page: { fontFamily: "'Inter','Segoe UI',sans-serif", background: "#0d0b1e", color: "#e8e6f0", minHeight: "100vh", paddingBottom: 320 },
-  header: { background: "linear-gradient(135deg,#141028,#1a1440)", borderBottom: "1px solid rgba(201,169,110,0.15)", padding: "16px 20px", textAlign: "center", position: "sticky", top: 0, zIndex: 100 },
-  h1: { fontSize: "1.3rem", fontWeight: 800, background: "linear-gradient(135deg,#e8a838,#c9a96e)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" },
-  sub: { color: "#7a7890", fontSize: "0.75rem", marginTop: 2 },
-  stats: { display: "flex", gap: 8, justifyContent: "center", marginTop: 10, flexWrap: "wrap" },
-  stat: { background: "rgba(255,255,255,0.04)", padding: "4px 12px", borderRadius: 20, fontSize: "0.7rem", color: "#7a7890", border: "1px solid rgba(255,255,255,0.06)" },
-  statVerbo: { background: "rgba(232,168,56,0.1)", border: "1px solid rgba(232,168,56,0.25)", color: "#e8a838" },
-  nav: { display: "flex", gap: 8, justifyContent: "center", marginTop: 10 },
-  navBtn: { padding: "6px 16px", borderRadius: 20, border: "1px solid rgba(201,169,110,0.2)", background: "rgba(201,169,110,0.08)", color: "#c9a96e", fontSize: "0.75rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, textDecoration: "none" },
-  container: { maxWidth: 600, margin: "0 auto", padding: "12px 16px" },
-  searchBox: { position: "relative", marginBottom: 10 },
-  searchInput: { width: "100%", padding: "10px 14px 10px 40px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, color: "#e8e6f0", fontSize: "0.9rem", outline: "none", fontFamily: "inherit" },
-  searchIcon: { position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "#7a7890", fontSize: 16 },
-  filters: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 4, marginBottom: 12 },
-  filterBtn: { padding: "6px 14px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#7a7890", fontSize: "0.75rem", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", fontWeight: 500 },
-  filterActive: { background: "rgba(108,99,255,0.25)", border: "1px solid rgba(108,99,255,0.4)", color: "#a99bff" },
-  filterVerbo: { background: "rgba(232,168,56,0.2)", border: "1px solid rgba(232,168,56,0.35)", color: "#e8a838" },
-  card: { display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10, cursor: "pointer", marginBottom: 4, transition: "all 0.15s" },
-  cardVerbo: { background: "rgba(232,168,56,0.06)", borderLeft: "3px solid rgba(232,168,56,0.5)" },
-  cardSelected: { border: "1px solid rgba(108,99,255,0.5)", background: "rgba(108,99,255,0.08)" },
-  cardSelectedVerbo: { border: "1px solid rgba(232,168,56,0.5)", background: "rgba(232,168,56,0.12)" },
-  thumb: { width: 52, height: 39, borderRadius: 6, objectFit: "cover", flexShrink: 0, background: "rgba(255,255,255,0.05)" },
+  page: { color: "var(--text)", minHeight: "100vh", paddingBottom: 340 },
+
+  // Hero header
+  hero: { maxWidth: 880, margin: "0 auto", padding: "32px 20px 8px", textAlign: "center" },
+  eyebrow: { display: "inline-block", padding: "6px 14px", borderRadius: 999, background: "var(--accent-soft)", border: "1px solid var(--accent-border)", color: "var(--accent-text)", fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 14 },
+  h1: { fontSize: "clamp(1.7rem, 5vw, 2.4rem)", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.02em", lineHeight: 1.1, marginBottom: 8 },
+  sub: { color: "var(--text-muted)", fontSize: "0.95rem", maxWidth: 480, margin: "0 auto" },
+  stats: { display: "flex", gap: 10, justifyContent: "center", marginTop: 18, flexWrap: "wrap" },
+  stat: { padding: "8px 16px", borderRadius: 999, fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 600, background: "var(--surface)", border: "1px solid var(--border)", backdropFilter: "blur(var(--blur))", WebkitBackdropFilter: "blur(var(--blur))" },
+  statVerbo: { background: "var(--verbo-soft)", border: "1px solid var(--verbo-border)", color: "var(--verbo-text)" },
+  statAdmin: { background: "var(--accent-soft)", border: "1px solid var(--accent-border)", color: "var(--accent-text)" },
+
+  container: { maxWidth: 880, margin: "0 auto", padding: "20px 20px 0" },
+
+  // Search + filters card
+  toolbar: { borderRadius: 22, padding: 16, marginBottom: 18 },
+  searchBox: { position: "relative", marginBottom: 12 },
+  searchInput: { width: "100%", padding: "13px 16px 13px 44px", background: "var(--input-bg)", border: "1px solid var(--border-strong)", borderRadius: 14, color: "var(--text)", fontSize: "0.95rem", outline: "none" },
+  searchIcon: { position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "var(--text-faint)", fontSize: 18 },
+
+  filtersTitle: { fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 8 },
+  filters: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 10, scrollbarWidth: "thin" },
+  filterBtn: { padding: "7px 14px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--chip-bg)", color: "var(--chip-text)", fontSize: "0.78rem", cursor: "pointer", whiteSpace: "nowrap", fontWeight: 600, transition: "all .15s" },
+  filterActive: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", border: "1px solid var(--accent-border)", color: "#fff", boxShadow: "0 4px 12px rgba(16,185,129,0.30)" },
+  filterVerbo: { background: "var(--verbo-soft)", border: "1px solid var(--verbo-border)", color: "var(--verbo-text)" },
+  temaRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6 },
+  temaChip: { padding: "6px 12px", borderRadius: 999, border: "1px solid var(--border)", background: "var(--chip-bg)", color: "var(--chip-text)", fontSize: "0.75rem", cursor: "pointer", whiteSpace: "nowrap", fontWeight: 600 },
+
+  // Song cards
+  songsGrid: { display: "grid", gap: 10 },
+  card: {
+    display: "flex", alignItems: "center", gap: 14, padding: 12,
+    borderRadius: 18, cursor: "pointer", transition: "all .2s ease",
+    background: "var(--surface)", border: "1px solid var(--border)",
+    backdropFilter: "blur(var(--blur))", WebkitBackdropFilter: "blur(var(--blur))",
+    boxShadow: "var(--shadow-sm)",
+  },
+  cardVerbo: { borderLeft: "3px solid var(--verbo)" },
+  cardSelected: { border: "1px solid var(--accent-border)", background: "var(--accent-soft)", boxShadow: "0 8px 24px rgba(16,185,129,0.18)" },
+  thumb: { width: 78, height: 58, borderRadius: 12, objectFit: "cover", flexShrink: 0, background: "var(--chip-bg)", boxShadow: "var(--shadow-sm)" },
   info: { flex: 1, minWidth: 0 },
-  title: { fontSize: "0.82rem", fontWeight: 600, color: "#e8e6f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  artist: { fontSize: "0.72rem", color: "#7a7890", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 1 },
-  badges: { display: "flex", gap: 4, marginTop: 3, flexWrap: "wrap" },
-  badgeVerbo: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(232,168,56,0.15)", color: "#e8a838" },
-  badgePerson: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(108,99,255,0.12)", color: "#a99bff" },
-  badgeTom: { fontSize: "0.6rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600, background: "rgba(91,200,175,0.12)", color: "#5bc8af" },
-  badgeTema: { fontSize: "0.58rem", padding: "1px 6px", borderRadius: 8, fontWeight: 600 },
-  temaRow: { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, marginBottom: 12, marginTop: -4 },
-  temaChip: { padding: "5px 11px", borderRadius: 20, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", color: "#7a7890", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", fontWeight: 600 },
-  check: { width: 22, height: 22, borderRadius: 6, border: "2px solid rgba(255,255,255,0.1)", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "transparent" },
-  checkSel: { background: "#6c63ff", borderColor: "#6c63ff", color: "#fff" },
-  checkSelVerbo: { background: "#e8a838", borderColor: "#e8a838", color: "#1a1440" },
-  // Bottom panel
-  bottom: { position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 150, background: "#141028", borderTop: "1px solid rgba(201,169,110,0.15)", boxShadow: "0 -2px 20px rgba(0,0,0,0.4)" },
-  bottomContent: { maxWidth: 600, margin: "0 auto", padding: "12px 16px 20px" },
-  repHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
-  repTitle: { fontSize: "0.95rem", fontWeight: 700, color: "#e8e6f0" },
-  repCount: { fontSize: "0.75rem", color: "#7a7890", background: "rgba(255,255,255,0.05)", padding: "2px 10px", borderRadius: 12 },
-  slot: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: 8, minHeight: 42, marginBottom: 6 },
-  slotFilled: { borderStyle: "solid", borderColor: "rgba(108,99,255,0.4)", background: "rgba(108,99,255,0.06)" },
-  slotFilledVerbo: { borderColor: "rgba(232,168,56,0.4)", background: "rgba(232,168,56,0.06)" },
-  slotNum: { width: 20, height: 20, borderRadius: "50%", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.65rem", fontWeight: 700, color: "#7a7890", flexShrink: 0 },
-  slotNumFilled: { background: "#6c63ff", color: "#fff" },
-  slotNumVerbo: { background: "#e8a838", color: "#1a1440" },
-  slotName: { fontSize: "0.78rem", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  slotArtist: { fontSize: "0.65rem", color: "#7a7890" },
-  slotEmpty: { fontSize: "0.75rem", color: "#4a4860", fontStyle: "italic" },
-  slotRemove: { background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 14, padding: 4, opacity: 0.6, flexShrink: 0 },
-  ruleWarn: { padding: "8px 10px", borderRadius: 8, marginBottom: 10, fontSize: "0.73rem", fontWeight: 500, background: "rgba(248,113,113,0.08)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)" },
-  ruleOk: { padding: "8px 10px", borderRadius: 8, marginBottom: 10, fontSize: "0.73rem", fontWeight: 500, background: "rgba(74,222,128,0.08)", color: "#4ade80", border: "1px solid rgba(74,222,128,0.2)" },
-  btnGenerate: { width: "100%", padding: 12, borderRadius: 8, border: "none", fontFamily: "inherit", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 },
-  btnEnabled: { background: "linear-gradient(135deg,#6c63ff,#8b83ff)", color: "#fff" },
-  btnDisabled: { background: "rgba(255,255,255,0.05)", color: "#4a4860", cursor: "not-allowed" },
-  // Modals
-  overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200, display: "flex", justifyContent: "center", alignItems: "flex-end", backdropFilter: "blur(4px)" },
-  modal: { background: "#1a1440", borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 560, maxHeight: "85vh", overflowY: "auto", border: "1px solid rgba(201,169,110,0.15)" },
-  modalThumb: { width: "100%", aspectRatio: "16/9", objectFit: "cover" },
-  modalBody: { padding: "16px 20px 24px" },
-  modalTitle: { fontSize: "1.15rem", fontWeight: 700, marginBottom: 2 },
-  modalArtist: { color: "#7a7890", fontSize: "0.88rem", marginBottom: 10 },
-  modalBadge: { padding: "3px 10px", borderRadius: 10, fontSize: "0.73rem", fontWeight: 600, display: "inline-block", marginRight: 6, marginBottom: 6 },
-  modalActions: { display: "flex", gap: 8, marginTop: 12 },
-  modalYt: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 16px", background: "#ff0000", color: "#fff", borderRadius: 8, textDecoration: "none", fontWeight: 600, fontSize: "0.85rem" },
-  modalSelect: { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "10px 16px", borderRadius: 8, border: "none", fontFamily: "inherit", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer", color: "#fff" },
-  modalClose: { width: "100%", marginTop: 8, padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#7a7890", fontFamily: "inherit", fontSize: "0.82rem", cursor: "pointer" },
-  letraTitle: { marginTop: 16, marginBottom: 6, fontSize: "0.78rem", fontWeight: 700, color: "#c9a96e", letterSpacing: "0.05em", textTransform: "uppercase" },
-  letraBox: { background: "rgba(0,0,0,0.3)", padding: 14, borderRadius: 8, fontSize: "0.85rem", lineHeight: 1.7, whiteSpace: "pre-wrap", color: "#d8d6e8", border: "1px solid rgba(255,255,255,0.06)", maxHeight: "40vh", overflowY: "auto", fontFamily: "'Inter','Segoe UI',sans-serif" },
-  letraEmpty: { background: "rgba(255,255,255,0.03)", padding: 14, borderRadius: 8, fontSize: "0.8rem", color: "#7a7890", fontStyle: "italic", textAlign: "center", border: "1px dashed rgba(255,255,255,0.1)" },
-  // Output
-  outputBox: { background: "#1a1440", borderRadius: "16px 16px 0 0", width: "100%", maxWidth: 560, padding: 20, maxHeight: "85vh", overflowY: "auto", border: "1px solid rgba(201,169,110,0.15)" },
-  outputTitle: { fontSize: "1.1rem", fontWeight: 700, marginBottom: 14, textAlign: "center" },
-  outputText: { background: "rgba(0,0,0,0.3)", padding: 14, borderRadius: 8, fontSize: "0.82rem", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 14, border: "1px solid rgba(255,255,255,0.06)", color: "#e8e6f0" },
-  btnCopy: { width: "100%", padding: 12, borderRadius: 8, border: "none", background: "#25d366", color: "#fff", fontFamily: "inherit", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 },
-  outputClose: { marginTop: 8, width: "100%", padding: 10, borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#7a7890", fontFamily: "inherit", fontSize: "0.82rem", cursor: "pointer" },
-  noResults: { textAlign: "center", padding: "40px 20px", color: "#4a4860", fontSize: "0.88rem" },
-  adminBtn: { padding: "5px 12px", borderRadius: 16, border: "1px solid rgba(232,168,56,0.35)", background: "rgba(232,168,56,0.08)", color: "#e8a838", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginLeft: 6 },
-  adminOnBtn: { padding: "5px 12px", borderRadius: 16, border: "1px solid rgba(74,222,128,0.4)", background: "rgba(74,222,128,0.1)", color: "#4ade80", fontSize: "0.7rem", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, marginLeft: 6 },
-  editBtn: { width: "100%", marginTop: 8, padding: "10px 14px", borderRadius: 8, border: "1px solid rgba(232,168,56,0.4)", background: "rgba(232,168,56,0.1)", color: "#e8a838", fontFamily: "inherit", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" },
-  keyRow: { display: "flex", gap: 6, flexWrap: "wrap", marginTop: 6 },
-  keyChip: { fontSize: "0.7rem", padding: "3px 9px", borderRadius: 10, background: "rgba(91,200,175,0.1)", color: "#5bc8af", border: "1px solid rgba(91,200,175,0.25)", fontWeight: 600 },
+  title: { fontSize: "0.95rem", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 },
+  artist: { fontSize: "0.78rem", color: "var(--text-muted)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginTop: 2 },
+  badges: { display: "flex", gap: 5, marginTop: 6, flexWrap: "wrap" },
+  badge: { fontSize: "0.65rem", padding: "2px 8px", borderRadius: 8, fontWeight: 700, letterSpacing: "0.02em" },
+  badgeVerbo: { background: "var(--verbo-soft)", color: "var(--verbo-text)", border: "1px solid var(--verbo-border)" },
+  badgePerson: { background: "var(--chip-bg)", color: "var(--chip-text)", border: "1px solid var(--border)" },
+  badgeTom: { background: "var(--accent-soft)", color: "var(--accent-text)", border: "1px solid var(--accent-border)" },
+  badgeTema: { },
+
+  check: {
+    width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 14, fontWeight: 800, cursor: "pointer",
+    background: "var(--surface-faint)", border: "1.5px solid var(--border-strong)",
+    color: "transparent", transition: "all .15s",
+  },
+  checkSel: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", borderColor: "var(--accent-strong)", color: "#fff", boxShadow: "0 4px 12px rgba(16,185,129,0.40)" },
+
+  // Bottom dock (Meu Repertório)
+  bottom: {
+    position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 150,
+    padding: "12px 14px 18px",
+    background: "var(--surface-strong)",
+    backdropFilter: "blur(24px) saturate(170%)",
+    WebkitBackdropFilter: "blur(24px) saturate(170%)",
+    borderTop: "1px solid var(--border)",
+    boxShadow: "0 -8px 32px rgba(15,23,42,0.10)",
+  },
+  bottomContent: { maxWidth: 880, margin: "0 auto" },
+  repHeader: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
+  repTitle: { fontSize: "0.92rem", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.01em" },
+  repCount: { fontSize: "0.76rem", color: "var(--text-muted)", background: "var(--chip-bg)", border: "1px solid var(--border)", padding: "4px 12px", borderRadius: 999, fontWeight: 700 },
+  slotsRow: { display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 10 },
+  slot: {
+    display: "flex", flexDirection: "column", gap: 4, padding: "9px 10px",
+    background: "var(--chip-bg)", border: "1.5px dashed var(--border-strong)",
+    borderRadius: 12, minHeight: 60, justifyContent: "center",
+  },
+  slotFilled: { borderStyle: "solid", background: "var(--accent-soft)", borderColor: "var(--accent-border)" },
+  slotFilledVerbo: { borderStyle: "solid", background: "var(--verbo-soft)", borderColor: "var(--verbo-border)" },
+  slotNum: { fontSize: "0.62rem", fontWeight: 800, color: "var(--text-faint)", letterSpacing: "0.06em", textTransform: "uppercase" },
+  slotNumActive: { color: "var(--accent-text)" },
+  slotNumActiveVerbo: { color: "var(--verbo-text)" },
+  slotName: { fontSize: "0.74rem", fontWeight: 700, color: "var(--text)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  slotEmpty: { fontSize: "0.7rem", color: "var(--text-faint)", fontStyle: "italic" },
+  slotRemove: { position: "absolute", top: 4, right: 4, background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 12, padding: 2 },
+  slotWrap: { position: "relative" },
+
+  ruleBar: { padding: "9px 14px", borderRadius: 12, marginBottom: 10, fontSize: "0.78rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 },
+  ruleWarn: { background: "rgba(239,68,68,0.10)", color: "var(--danger)", border: "1px solid rgba(239,68,68,0.30)" },
+  ruleOk: { background: "var(--accent-soft)", color: "var(--accent-text)", border: "1px solid var(--accent-border)" },
+
+  btnGenerate: {
+    width: "100%", padding: "14px 20px", borderRadius: 14, border: "none",
+    fontSize: "0.95rem", fontWeight: 800, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+    transition: "all .2s",
+  },
+  btnEnabled: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", color: "#fff", boxShadow: "0 8px 22px rgba(16,185,129,0.35)" },
+  btnDisabled: { background: "var(--chip-bg)", color: "var(--text-faint)", cursor: "not-allowed", border: "1px solid var(--border)" },
+
+  // ─── Centered modal ───
+  overlay: {
+    position: "fixed", inset: 0, zIndex: 250,
+    background: "var(--overlay)", backdropFilter: "blur(8px)",
+    WebkitBackdropFilter: "blur(8px)",
+    display: "flex", justifyContent: "center", alignItems: "center",
+    padding: 18,
+  },
+  modal: {
+    width: "100%", maxWidth: 640, maxHeight: "92vh", overflowY: "auto",
+    borderRadius: 24, background: "var(--surface-strong)",
+    backdropFilter: "blur(24px) saturate(180%)",
+    WebkitBackdropFilter: "blur(24px) saturate(180%)",
+    border: "1px solid var(--border-strong)",
+    boxShadow: "var(--shadow-lg)",
+  },
+  modalClose: {
+    position: "absolute", top: 14, right: 14, zIndex: 5,
+    width: 36, height: 36, borderRadius: "50%", border: "none",
+    background: "rgba(0,0,0,0.5)", color: "#fff", fontSize: 18,
+    cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+    backdropFilter: "blur(8px)",
+  },
+  videoWrap: { position: "relative", width: "100%", aspectRatio: "16/9", background: "#000", borderRadius: "24px 24px 0 0", overflow: "hidden" },
+  videoIframe: { width: "100%", height: "100%", border: "none" },
+
+  modalBody: { padding: "22px 24px 26px" },
+  modalTitle: { fontSize: "1.35rem", fontWeight: 800, color: "var(--text)", letterSpacing: "-0.01em", lineHeight: 1.2, marginBottom: 4 },
+  modalArtist: { color: "var(--text-muted)", fontSize: "0.92rem", marginBottom: 14 },
+  modalBadges: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 },
+  modalBadge: { padding: "5px 11px", borderRadius: 10, fontSize: "0.74rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 4 },
+
+  modalActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 },
+  actionBtn: {
+    display: "flex", alignItems: "center", justifyContent: "center", gap: 7,
+    padding: "12px 14px", borderRadius: 12, border: "none", cursor: "pointer",
+    fontSize: "0.85rem", fontWeight: 700, textDecoration: "none",
+    transition: "all .15s",
+  },
+  actionPrimary: { background: "linear-gradient(135deg, var(--accent), var(--accent-strong))", color: "#fff", boxShadow: "0 6px 16px rgba(16,185,129,0.30)" },
+  actionSecondary: { background: "var(--chip-bg)", color: "var(--text)", border: "1px solid var(--border-strong)" },
+  actionRed: { background: "rgba(239,68,68,0.10)", color: "var(--danger)", border: "1px solid rgba(239,68,68,0.30)" },
+  actionSuccess: { background: "rgba(34,197,94,0.10)", color: "#16a34a", border: "1px solid rgba(34,197,94,0.30)" },
+
+  editBtn: {
+    width: "100%", marginTop: 10, padding: "12px 14px",
+    borderRadius: 12, border: "1px solid var(--verbo-border)",
+    background: "var(--verbo-soft)", color: "var(--verbo-text)",
+    fontWeight: 700, fontSize: "0.85rem", cursor: "pointer",
+  },
+
+  sectionTitle: { marginTop: 18, marginBottom: 8, fontSize: "0.7rem", fontWeight: 800, color: "var(--text-faint)", letterSpacing: "0.10em", textTransform: "uppercase" },
+  letraBox: { background: "var(--chip-bg)", padding: 16, borderRadius: 14, fontSize: "0.88rem", lineHeight: 1.75, whiteSpace: "pre-wrap", color: "var(--text)", border: "1px solid var(--border)", maxHeight: "32vh", overflowY: "auto" },
+  letraEmpty: { background: "var(--chip-bg)", padding: 16, borderRadius: 14, fontSize: "0.82rem", color: "var(--text-faint)", fontStyle: "italic", textAlign: "center", border: "1px dashed var(--border-strong)" },
+  keyRow: { display: "flex", gap: 6, flexWrap: "wrap" },
+  keyChip: { fontSize: "0.74rem", padding: "5px 11px", borderRadius: 10, background: "var(--accent-soft)", color: "var(--accent-text)", border: "1px solid var(--accent-border)", fontWeight: 700 },
+
+  // Output box
+  outputBox: { padding: 24 },
+  outputTitle: { fontSize: "1.2rem", fontWeight: 800, marginBottom: 14, textAlign: "center", color: "var(--text)" },
+  outputText: { background: "var(--chip-bg)", padding: 16, borderRadius: 14, fontSize: "0.85rem", lineHeight: 1.7, whiteSpace: "pre-wrap", marginBottom: 14, border: "1px solid var(--border)", color: "var(--text)", maxHeight: "50vh", overflowY: "auto" },
+  btnCopy: { width: "100%", padding: 13, borderRadius: 12, border: "none", background: "#25d366", color: "#fff", fontSize: "0.92rem", fontWeight: 800, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, boxShadow: "0 6px 18px rgba(37,211,102,0.30)" },
+  outputClose: { marginTop: 8, width: "100%", padding: 11, borderRadius: 12, border: "1px solid var(--border-strong)", background: "transparent", color: "var(--text-muted)", fontSize: "0.85rem", cursor: "pointer", fontWeight: 600 },
+
+  noResults: { textAlign: "center", padding: "60px 20px", color: "var(--text-faint)", fontSize: "0.92rem" },
 };
 
 // ─── COMPONENT ──────────────────────────────────────────────────────────────
@@ -434,118 +524,123 @@ export default function Repertorio() {
   return (
     <div style={S.page}>
       <SiteHeader current="repertorio" />
-      {/* HEADER */}
-      <div style={S.header}>
+
+      {/* HERO */}
+      <div style={S.hero}>
+        <div style={S.eyebrow}>✦ Verbo Orlando · Winter Garden</div>
         <h1 style={S.h1}>Repertório de Louvor</h1>
-        <p style={S.sub}>Verbo Orlando — Winter Garden</p>
+        <p style={S.sub}>Escolha 4 músicas para o próximo culto. Pelo menos uma do Verbo da Vida.</p>
         <div style={S.stats}>
-          <span style={S.stat}><b>{SONGS.length}</b> músicas</span>
-          <span style={{...S.stat,...S.statVerbo}}><b>{SONGS.filter(s=>s.verbo).length}</b> Verbo da Vida</span>
-          {admin && <span style={{...S.stat, ...S.statVerbo}}>✓ Admin{savingFlash ? " ⏳" : ""}</span>}
+          <span style={S.stat}><b>{SONGS.length}</b> &nbsp;músicas</span>
+          <span style={{...S.stat,...S.statVerbo}}>⭐ <b>{SONGS.filter(s=>s.verbo).length}</b> &nbsp;Verbo da Vida</span>
+          {admin && <span style={{...S.stat,...S.statAdmin}}>✓ Admin{savingFlash ? " ⏳" : ""}</span>}
         </div>
       </div>
 
       {/* CONTENT */}
       <div style={S.container}>
-        {/* Search */}
-        <div style={S.searchBox}>
-          <span style={S.searchIcon}>🔍</span>
-          <input style={S.searchInput} placeholder="Buscar música ou artista..." value={search} onChange={e => setSearch(e.target.value)} />
-        </div>
-
-        {/* Filters */}
-        <div style={S.filters}>
-          {filters.map(f => (
-            <button key={f.id} onClick={() => setFilter(f.id)}
-              style={{...S.filterBtn, ...(filter===f.id ? (f.id==="verbo" ? S.filterVerbo : S.filterActive) : {})}}
-            >{f.label}</button>
-          ))}
-        </div>
-
-        {/* Tema chips */}
-        <div style={S.temaRow}>
-          <button onClick={() => setTema("all")}
-            style={{...S.temaChip, ...(tema==="all" ? {background:"rgba(108,99,255,0.25)", borderColor:"rgba(108,99,255,0.4)", color:"#a99bff"} : {})}}
-          >Todos os temas</button>
-          {Object.entries(TEMAS_DEF).map(([id, def]) => (
-            <button key={id} onClick={() => setTema(id)}
-              style={{
-                ...S.temaChip,
-                ...(tema===id ? {background: def.bg, border:`1px solid ${def.border}`, color: def.color} : {})
-              }}
-            >{def.label}</button>
-          ))}
-        </div>
-
-        {/* Song List */}
-        {filtered.length === 0 ? (
-          <div style={S.noResults}>Nenhuma música encontrada</div>
-        ) : filtered.map(s => {
-          const isSel = selected.some(x => x.num === s.num);
-          const t = thumb(s.videoId);
-          const cardStyle = {
-            ...S.card,
-            ...(s.verbo ? S.cardVerbo : {}),
-            ...(isSel ? (s.verbo ? S.cardSelectedVerbo : S.cardSelected) : {}),
-          };
-          const checkStyle = {
-            ...S.check,
-            ...(isSel ? (s.verbo ? S.checkSelVerbo : S.checkSel) : {}),
-          };
-          return (
-            <div key={s.num} style={cardStyle}>
-              {t ? <img src={t} style={S.thumb} loading="lazy" onClick={() => setDetail(s)} /> : <div style={S.thumb} onClick={() => setDetail(s)} />}
-              <div style={S.info} onClick={() => setDetail(s)}>
-                <div style={S.title}>{s.musica}</div>
-                <div style={S.artist}>{s.artista}</div>
-                <div style={S.badges}>
-                  {s.verbo && <span style={S.badgeVerbo}>⭐ Verbo da Vida</span>}
-                  {s.indicadaPor && <span style={S.badgePerson}>{s.indicadaPor}</span>}
-                  {s.tom && s.tom !== "-" && <span style={S.badgeTom}>{s.tom}</span>}
-                  {getEffectiveTemas(s).map(tid => {
-                    const def = TEMAS_DEF[tid]; if (!def) return null;
-                    return <span key={tid} style={{...S.badgeTema, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
-                  })}
-                </div>
-              </div>
-              <div style={checkStyle} onClick={() => toggle(s.num)}>
-                {isSel ? "✓" : ""}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* BOTTOM PANEL */}
-      <div style={S.bottom}>
-        <div style={S.bottomContent}>
-          <div style={S.repHeader}>
-            <span style={S.repTitle}>Meu Repertório</span>
-            <span style={S.repCount}>{selected.length}/4</span>
+        {/* Toolbar (search + filters) */}
+        <div className="glass" style={S.toolbar}>
+          <div style={S.searchBox}>
+            <span style={S.searchIcon}>🔍</span>
+            <input style={S.searchInput} placeholder="Buscar música, artista ou pessoa..." value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          {[0,1,2,3].map(i => {
-            const s = selected[i];
-            const slotStyle = {
-              ...S.slot,
-              ...(s ? (s.verbo ? S.slotFilledVerbo : S.slotFilled) : {}),
+
+          <div style={S.filtersTitle}>Filtros</div>
+          <div style={S.filters}>
+            {filters.map(f => (
+              <button key={f.id} onClick={() => setFilter(f.id)}
+                style={{...S.filterBtn, ...(filter===f.id ? (f.id==="verbo" ? S.filterVerbo : S.filterActive) : {})}}
+              >{f.label}</button>
+            ))}
+          </div>
+
+          <div style={S.filtersTitle}>Temas</div>
+          <div style={S.temaRow}>
+            <button onClick={() => setTema("all")}
+              style={{...S.temaChip, ...(tema==="all" ? S.filterActive : {})}}
+            >Todos</button>
+            {Object.entries(TEMAS_DEF).map(([id, def]) => (
+              <button key={id} onClick={() => setTema(id)}
+                style={{
+                  ...S.temaChip,
+                  ...(tema===id ? {background: def.bg, border:`1px solid ${def.border}`, color: def.color, fontWeight:700} : {})
+                }}
+              >{def.label}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Song grid */}
+        <div style={S.songsGrid}>
+          {filtered.length === 0 ? (
+            <div style={S.noResults}>Nenhuma música encontrada</div>
+          ) : filtered.map(s => {
+            const isSel = selected.some(x => x.num === s.num);
+            const t = thumb(s.videoId);
+            const cardStyle = {
+              ...S.card,
+              ...(s.verbo ? S.cardVerbo : {}),
+              ...(isSel ? S.cardSelected : {}),
             };
-            const numStyle = {
-              ...S.slotNum,
-              ...(s ? (s.verbo ? S.slotNumVerbo : S.slotNumFilled) : {}),
-            };
+            const checkStyle = { ...S.check, ...(isSel ? S.checkSel : {}) };
             return (
-              <div key={i} style={slotStyle}>
-                <div style={numStyle}>{i+1}</div>
-                <div style={{flex:1,minWidth:0}}>
-                  {s ? (<><div style={S.slotName}>{s.musica}</div><div style={S.slotArtist}>{s.artista}{s.verbo?" ⭐":""}</div></>) :
-                    <div style={S.slotEmpty}>{slotMsgs[i]}</div>}
+              <div key={s.num} style={cardStyle} onClick={() => setDetail(s)}>
+                {t ? <img src={t} style={S.thumb} loading="lazy" alt="" /> : <div style={S.thumb} />}
+                <div style={S.info}>
+                  <div style={S.title}>{s.musica}</div>
+                  <div style={S.artist}>{s.artista}</div>
+                  <div style={S.badges}>
+                    {s.verbo && <span style={{...S.badge, ...S.badgeVerbo}}>⭐ Verbo da Vida</span>}
+                    {s.indicadaPor && <span style={{...S.badge, ...S.badgePerson}}>{s.indicadaPor}</span>}
+                    {s.tom && s.tom !== "-" && <span style={{...S.badge, ...S.badgeTom}}>♪ {s.tom}</span>}
+                    {getEffectiveTemas(s).map(tid => {
+                      const def = TEMAS_DEF[tid]; if (!def) return null;
+                      return <span key={tid} style={{...S.badge, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
+                    })}
+                  </div>
                 </div>
-                {s && <button style={S.slotRemove} onClick={() => remove(s.num)}>✕</button>}
+                <div style={checkStyle} onClick={(e) => { e.stopPropagation(); toggle(s.num); }} title={isSel ? "Remover" : "Adicionar"}>
+                  {isSel ? "✓" : "+"}
+                </div>
               </div>
             );
           })}
-          <div style={hasVerbo ? S.ruleOk : S.ruleWarn}>
-            {hasVerbo ? `✅ ${selected.filter(s=>s.verbo).length} música(s) do Verbo da Vida` : "⚠️ Mínimo 1 música do Verbo da Vida obrigatória"}
+        </div>
+      </div>
+
+      {/* BOTTOM DOCK */}
+      <div style={S.bottom}>
+        <div style={S.bottomContent}>
+          <div style={S.repHeader}>
+            <span style={S.repTitle}>♪ Meu Repertório</span>
+            <span style={S.repCount}>{selected.length}/4</span>
+          </div>
+          <div style={S.slotsRow}>
+            {[0,1,2,3].map(i => {
+              const s = selected[i];
+              const slotStyle = {
+                ...S.slot,
+                ...(s ? (s.verbo ? S.slotFilledVerbo : S.slotFilled) : {}),
+              };
+              const numStyle = {
+                ...S.slotNum,
+                ...(s ? (s.verbo ? S.slotNumActiveVerbo : S.slotNumActive) : {}),
+              };
+              return (
+                <div key={i} style={S.slotWrap}>
+                  <div style={slotStyle}>
+                    <div style={numStyle}>#{i+1}{s?.verbo ? " ⭐" : ""}</div>
+                    {s ? <div style={S.slotName}>{s.musica}</div>
+                       : <div style={S.slotEmpty}>{slotMsgs[i]}</div>}
+                  </div>
+                  {s && <button style={S.slotRemove} onClick={() => remove(s.num)} title="Remover">✕</button>}
+                </div>
+              );
+            })}
+          </div>
+          <div style={{...S.ruleBar, ...(hasVerbo ? S.ruleOk : S.ruleWarn)}}>
+            {hasVerbo ? `✓ ${selected.filter(s=>s.verbo).length} música(s) do Verbo da Vida` : "⚠ Mínimo 1 música do Verbo da Vida obrigatória"}
           </div>
           <button style={{...S.btnGenerate, ...(canGenerate ? S.btnEnabled : S.btnDisabled)}} disabled={!canGenerate} onClick={generate}>
             📋 Gerar Repertório para WhatsApp
@@ -553,49 +648,89 @@ export default function Repertorio() {
         </div>
       </div>
 
-      {/* DETAIL MODAL */}
+      {/* DETAIL MODAL — centered with YouTube embed */}
       {detail && (
-        <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) setDetail(null); }}>
-          <div style={S.modal}>
-            {detail.videoId && <img src={thumb(detail.videoId)} style={S.modalThumb} />}
-            <div style={S.modalBody}>
-              <div style={S.modalTitle}>{detail.musica}</div>
-              <div style={S.modalArtist}>{detail.artista}</div>
-              <div>
-                {detail.verbo && <span style={{...S.modalBadge,background:"rgba(232,168,56,0.15)",color:"#e8a838",border:"1px solid rgba(232,168,56,0.3)"}}>⭐ Verbo da Vida</span>}
-                {detail.indicadaPor && <span style={{...S.modalBadge,background:"rgba(108,99,255,0.12)",color:"#a99bff",border:"1px solid rgba(108,99,255,0.25)"}}>Indicada por: {detail.indicadaPor}</span>}
-                {detail.tom && detail.tom!=="-" && <span style={{...S.modalBadge,background:"rgba(91,200,175,0.12)",color:"#5bc8af",border:"1px solid rgba(91,200,175,0.25)"}}>Tom: {detail.tom}</span>}
-                {getEffectiveTemas(detail).map(tid => {
-                  const def = TEMAS_DEF[tid]; if (!def) return null;
-                  return <span key={tid} style={{...S.modalBadge, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
-                })}
-              </div>
-              {getKeysFor(detail).length > 0 && (
-                <>
-                  <div style={S.letraTitle}>🎼 Tons por cantor</div>
-                  <div style={S.keyRow}>
-                    {getKeysFor(detail).map((k, i) => (
-                      <span key={i} style={S.keyChip}>{k.cantor || "?"} → <b>{k.tom || "—"}</b></span>
-                    ))}
-                  </div>
-                </>
+        <div style={S.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget) setDetail(null); }}>
+          <div style={{ position: "relative", width: "100%", maxWidth: 640 }} className="v-scale">
+            <div style={S.modal}>
+              <button style={S.modalClose} onClick={() => setDetail(null)} title="Fechar">✕</button>
+              {detail.videoId && (
+                <div style={S.videoWrap}>
+                  <iframe
+                    style={S.videoIframe}
+                    src={ytEmbed(detail.videoId)}
+                    title={detail.musica}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
               )}
-              <div style={S.modalActions}>
-                {detail.videoId && <a href={ytLink(detail.videoId)} target="_blank" rel="noreferrer" style={S.modalYt}>▶ YouTube</a>}
-                <button onClick={() => { toggle(detail.num); }} style={{...S.modalSelect, background: selected.some(x=>x.num===detail.num) ? "#16a34a" : "#6c63ff"}}>
-                  {selected.some(x=>x.num===detail.num) ? "✓ Selecionada" : "+ Adicionar"}
-                </button>
+              <div style={S.modalBody}>
+                <div style={S.modalTitle}>{detail.musica}</div>
+                <div style={S.modalArtist}>{detail.artista}</div>
+                <div style={S.modalBadges}>
+                  {detail.verbo && <span style={{...S.modalBadge, background:"var(--verbo-soft)", color:"var(--verbo-text)", border:"1px solid var(--verbo-border)"}}>⭐ Verbo da Vida</span>}
+                  {detail.indicadaPor && <span style={{...S.modalBadge, background:"var(--chip-bg)", color:"var(--chip-text)", border:"1px solid var(--border)"}}>👤 {detail.indicadaPor}</span>}
+                  {detail.tom && detail.tom!=="-" && <span style={{...S.modalBadge, background:"var(--accent-soft)", color:"var(--accent-text)", border:"1px solid var(--accent-border)"}}>♪ Tom {detail.tom}</span>}
+                  {getEffectiveTemas(detail).map(tid => {
+                    const def = TEMAS_DEF[tid]; if (!def) return null;
+                    return <span key={tid} style={{...S.modalBadge, background: def.bg, color: def.color, border:`1px solid ${def.border}`}}>{def.label}</span>;
+                  })}
+                </div>
+
+                {/* Action buttons */}
+                <div style={S.modalActions}>
+                  <button
+                    onClick={() => toggle(detail.num)}
+                    style={{...S.actionBtn, ...(selected.some(x=>x.num===detail.num) ? S.actionSuccess : S.actionPrimary)}}
+                  >
+                    {selected.some(x=>x.num===detail.num) ? "✓ Selecionada" : "+ Adicionar ao Repertório"}
+                  </button>
+                  <a
+                    href={cifraClubLink(detail.musica, detail.artista)}
+                    target="_blank" rel="noreferrer"
+                    style={{...S.actionBtn, ...S.actionSecondary}}
+                  >
+                    🎸 Cifra Club
+                  </a>
+                  <a
+                    href={ytLink(detail.videoId)} target="_blank" rel="noreferrer"
+                    style={{...S.actionBtn, ...S.actionRed}}
+                  >
+                    ▶ YouTube
+                  </a>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${detail.musica} — ${detail.artista}\n${ytLink(detail.videoId)}`);
+                    }}
+                    style={{...S.actionBtn, ...S.actionSecondary}}
+                  >
+                    📋 Copiar link
+                  </button>
+                </div>
+
+                {admin && (
+                  <button style={S.editBtn} onClick={() => setEditing(detail)}>
+                    ✏️ Editar música (admin)
+                  </button>
+                )}
+
+                {getKeysFor(detail).length > 0 && (
+                  <>
+                    <div style={S.sectionTitle}>🎼 Tons por cantor</div>
+                    <div style={S.keyRow}>
+                      {getKeysFor(detail).map((k, i) => (
+                        <span key={i} style={S.keyChip}>{k.cantor || "?"} → <b>{k.tom || "—"}</b></span>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                <div style={S.sectionTitle}>📜 Letra</div>
+                {LETRAS[detail.videoId] && LETRAS[detail.videoId].trim()
+                  ? <div style={S.letraBox}>{LETRAS[detail.videoId]}</div>
+                  : <div style={S.letraEmpty}>Letra ainda não cadastrada</div>}
               </div>
-              {admin && (
-                <button style={S.editBtn} onClick={() => setEditing(detail)}>
-                  ✏️ Editar música (admin)
-                </button>
-              )}
-              <div style={S.letraTitle}>📜 Letra</div>
-              {LETRAS[detail.videoId] && LETRAS[detail.videoId].trim()
-                ? <div style={S.letraBox}>{LETRAS[detail.videoId]}</div>
-                : <div style={S.letraEmpty}>Letra ainda não cadastrada</div>}
-              <button style={S.modalClose} onClick={() => setDetail(null)}>Fechar</button>
             </div>
           </div>
         </div>
@@ -616,14 +751,18 @@ export default function Repertorio() {
 
       {/* OUTPUT MODAL */}
       {showOutput && (
-        <div style={S.overlay} onClick={e => { if (e.target === e.currentTarget) setShowOutput(false); }}>
-          <div style={S.outputBox}>
-            <div style={S.outputTitle}>📋 Repertório Pronto!</div>
-            <div style={S.outputText}>{getOutputText()}</div>
-            <button style={{...S.btnCopy, ...(copied ? {background:"#16a34a"} : {})}} onClick={copyText}>
-              {copied ? "✅ Copiado!" : "📱 Copiar para WhatsApp"}
-            </button>
-            <button style={S.outputClose} onClick={() => setShowOutput(false)}>Fechar</button>
+        <div style={S.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget) setShowOutput(false); }}>
+          <div className="v-scale" style={{ width: "100%", maxWidth: 560 }}>
+            <div style={S.modal}>
+              <div style={S.outputBox}>
+                <div style={S.outputTitle}>✓ Repertório Pronto!</div>
+                <div style={S.outputText}>{getOutputText()}</div>
+                <button style={{...S.btnCopy, ...(copied ? {background:"#16a34a"} : {})}} onClick={copyText}>
+                  {copied ? "✓ Copiado!" : "📱 Copiar para WhatsApp"}
+                </button>
+                <button style={S.outputClose} onClick={() => setShowOutput(false)}>Fechar</button>
+              </div>
+            </div>
           </div>
         </div>
       )}
