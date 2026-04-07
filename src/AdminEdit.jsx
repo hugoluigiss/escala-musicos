@@ -97,7 +97,7 @@ export function LoginModal({ open, onClose, onLogin }) {
 // ─── PersonPicker ──────────────────────────────────────────────────────────
 // Dropdown button that lists all registered singers. Clicking an item selects
 // it. Clicking outside closes the menu.
-function PersonPicker({ value, pessoas, placeholder, onChange }) {
+export function PersonPicker({ value, pessoas, placeholder, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {

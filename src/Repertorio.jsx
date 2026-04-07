@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { TEMAS, TEMAS_DEF } from "./temas.js";
 import { apiGet, apiPut, isAdmin as checkIsAdmin } from "./api.js";
-import { EditSongModal, PessoasModal, AddSongModal } from "./AdminEdit.jsx";
+import { EditSongModal, PessoasModal, AddSongModal, PersonPicker } from "./AdminEdit.jsx";
 import SiteHeader from "./SiteHeader.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
@@ -303,6 +303,10 @@ export default function Repertorio() {
   const [detail, setDetail] = useState(null);
   const [showOutput, setShowOutput] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Confirm step (lead + tom per song) before generating WhatsApp output
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [confirmRows, setConfirmRows] = useState([]); // [{ videoId, lead, tom }]
+  const [savingConfirm, setSavingConfirm] = useState(false);
 
   // ── Admin / overrides state ──
   const [admin, setAdmin] = useState(checkIsAdmin());
@@ -596,13 +600,65 @@ export default function Repertorio() {
 
   function generate() {
     if (!canGenerate) return;
-    setShowOutput(true);
+    // Pre-fill the confirm rows with the best guess for each song:
+    // - lead: existing indicadaPor if any
+    // - tom: if there's already a tom registered for that lead in song_keys, use it;
+    //        otherwise use the song's general tom (s.tom) when it isn't a placeholder.
+    const rows = selected.map(s => {
+      const lead = (s.indicadaPor || "").trim();
+      const keys = getKeysFor(s);
+      const known = lead ? keys.find(k => (k.cantor || "").trim() === lead) : null;
+      let tom = "";
+      if (known && known.tom) tom = known.tom;
+      else if (s.tom && s.tom !== "-" && s.tom !== "") tom = s.tom;
+      return { videoId: s.videoId, lead, tom };
+    });
+    setConfirmRows(rows);
+    setShowConfirm(true);
+  }
+
+  // Persist the chosen lead/tom into song_keys (per-singer history) and open
+  // the WhatsApp output modal. Tom can be left blank — only saves when filled.
+  async function confirmAndShow() {
+    setSavingConfirm(true);
+    try {
+      const nextKeys = { ...songKeys };
+      confirmRows.forEach(row => {
+        const lead = (row.lead || "").trim();
+        const tom = (row.tom || "").trim();
+        if (!lead || !tom) return; // nothing to persist for this song
+        const arr = Array.isArray(nextKeys[row.videoId]) ? [...nextKeys[row.videoId]] : [];
+        const idx = arr.findIndex(k => (k.cantor || "").trim() === lead);
+        if (idx >= 0) arr[idx] = { cantor: lead, tom };
+        else arr.push({ cantor: lead, tom });
+        nextKeys[row.videoId] = arr;
+      });
+      // Only hit the API if anything actually changed
+      if (JSON.stringify(nextKeys) !== JSON.stringify(songKeys)) {
+        await apiPut("song_keys", nextKeys);
+        setSongKeys(nextKeys);
+      }
+      setShowConfirm(false);
+      setShowOutput(true);
+    } catch (e) {
+      console.error("Failed to save song_keys", e);
+      // Still show the output even if persistence fails
+      setShowConfirm(false);
+      setShowOutput(true);
+    } finally {
+      setSavingConfirm(false);
+    }
   }
 
   function getOutputText() {
     let t = `🎵 *REPERTÓRIO DE LOUVOR*\n📍 Verbo Orlando — Winter Garden\n━━━━━━━━━━━━━━━━━━━━━\n\n`;
     selected.forEach((s, i) => {
+      const row = confirmRows.find(r => r.videoId === s.videoId);
+      const lead = row && row.lead ? row.lead.trim() : "";
+      const tom = row && row.tom ? row.tom.trim() : "";
       t += `*${i+1}. ${s.musica}*${s.verbo ? " ⭐" : ""}\n🎤 ${s.artista}\n`;
+      if (lead) t += `🎙 Lead: ${lead}${tom ? ` · Tom: ${tom}` : ""}\n`;
+      else if (tom) t += `🎼 Tom: ${tom}\n`;
       if (s.videoId) t += `🔗 https://youtu.be/${s.videoId}\n`;
       t += "\n";
     });
@@ -921,6 +977,121 @@ export default function Repertorio() {
           onSave={handleAddSong}
           onClose={() => setShowAddSong(false)}
         />
+      )}
+
+      {/* CONFIRM MODAL — pick lead + tom for each of the 4 selected songs */}
+      {showConfirm && (
+        <div style={S.overlay} className="v-fade" onClick={e => { if (e.target === e.currentTarget) setShowConfirm(false); }}>
+          <div className="v-scale" style={{ width: "100%", maxWidth: 560 }}>
+            <div style={S.modal}>
+              <div style={{ padding: 24 }}>
+                <div style={S.outputTitle}>🎙 Confirmar Lead e Tom</div>
+                <div style={{ fontSize: "0.82rem", color: "var(--text-muted)", textAlign: "center", marginBottom: 18 }}>
+                  Para cada música, escolha quem vai cantar (Lead) e o tom. O tom pode ficar em branco se ainda não souber.
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
+                  {selected.map((s, i) => {
+                    const row = confirmRows[i] || { videoId: s.videoId, lead: "", tom: "" };
+                    const update = (patch) => {
+                      setConfirmRows(prev => {
+                        const next = [...prev];
+                        next[i] = { ...next[i], ...patch };
+                        return next;
+                      });
+                    };
+                    return (
+                      <div key={s.videoId} style={{
+                        background: "var(--chip-bg)",
+                        border: "1px solid var(--border)",
+                        borderRadius: 14,
+                        padding: 14,
+                      }}>
+                        <div style={{ fontSize: "0.88rem", fontWeight: 800, color: "var(--text)", marginBottom: 2 }}>
+                          {i+1}. {s.musica}{s.verbo ? " ⭐" : ""}
+                        </div>
+                        <div style={{ fontSize: "0.76rem", color: "var(--text-muted)", marginBottom: 10 }}>
+                          {s.artista}
+                        </div>
+                        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                          Lead
+                        </div>
+                        <PersonPicker
+                          value={row.lead}
+                          pessoas={pessoas}
+                          placeholder="Selecione o cantor"
+                          onChange={(v) => update({ lead: v })}
+                        />
+                        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-faint)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6, marginTop: 12 }}>
+                          Tom <span style={{ textTransform: "none", fontWeight: 500, color: "var(--text-faint)" }}>(opcional)</span>
+                        </div>
+                        <input
+                          value={row.tom}
+                          onChange={e => update({ tom: e.target.value })}
+                          placeholder="Ex: G, Bb, F#m — ou deixe em branco"
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            background: "var(--input-bg)",
+                            border: "1px solid var(--border-strong)",
+                            borderRadius: 10,
+                            color: "var(--text)",
+                            fontSize: "0.86rem",
+                            outline: "none",
+                            fontFamily: "inherit",
+                            boxSizing: "border-box",
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div style={{ display: "flex", gap: 10, marginTop: 18 }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm(false)}
+                    style={{
+                      flex: 1,
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "1px solid var(--border-strong)",
+                      background: "transparent",
+                      color: "var(--text-muted)",
+                      fontSize: "0.86rem",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    Voltar
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingConfirm}
+                    onClick={confirmAndShow}
+                    style={{
+                      flex: 2,
+                      padding: 12,
+                      borderRadius: 12,
+                      border: "none",
+                      background: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+                      color: "#fff",
+                      fontSize: "0.92rem",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      fontFamily: "inherit",
+                      opacity: savingConfirm ? 0.6 : 1,
+                      boxShadow: "0 6px 18px rgba(16,185,129,0.30)",
+                    }}
+                  >
+                    {savingConfirm ? "Salvando..." : "✓ Confirmar e gerar texto"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* OUTPUT MODAL */}
