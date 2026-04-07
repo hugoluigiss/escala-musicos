@@ -731,6 +731,7 @@ export default function Repertorio() {
     }
   }
 
+  // Datas em formato americano (MM/DD/YYYY)
   function formatBrDateTime(iso) {
     if (!iso) return "";
     try {
@@ -738,9 +739,11 @@ export default function Repertorio() {
       const dd = String(d.getDate()).padStart(2, "0");
       const mm = String(d.getMonth() + 1).padStart(2, "0");
       const yyyy = d.getFullYear();
-      const hh = String(d.getHours()).padStart(2, "0");
+      let hh = d.getHours();
       const mi = String(d.getMinutes()).padStart(2, "0");
-      return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+      const ampm = hh >= 12 ? "PM" : "AM";
+      hh = hh % 12 || 12;
+      return `${mm}/${dd}/${yyyy} ${hh}:${mi} ${ampm}`;
     } catch { return iso; }
   }
 
@@ -748,7 +751,7 @@ export default function Repertorio() {
     if (!iso) return "";
     const [y, m, d] = iso.split("-");
     if (!y || !m || !d) return iso;
-    return `${d}/${m}/${y}`;
+    return `${m}/${d}/${y}`;
   }
 
   function getOutputText() {
