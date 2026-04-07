@@ -92,7 +92,10 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
   const [indicadaPor, setIndicadaPor] = useState((currentOverride?.indicadaPor) ?? song.indicadaPor ?? "");
   const [tom, setTom] = useState((currentOverride?.tom) ?? song.tom ?? "");
   const [keys, setKeys] = useState(currentKeys || []);
+  // pessoas: lista atual de nomes (editável)
+  // pessoasOriginais: snapshot ao abrir o modal — usado para detectar renames
   const [pessoas, setPessoas] = useState(initialPessoas || []);
+  const [pessoasOriginais] = useState(initialPessoas || []);
   const [newPessoa, setNewPessoa] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
@@ -120,14 +123,30 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
     setPessoas(prev => [...prev, n]);
     setNewPessoa("");
   }
-  function removePessoa(name) {
-    setPessoas(prev => prev.filter(p => p !== name));
+  function removePessoa(idx) {
+    setPessoas(prev => prev.filter((_, i) => i !== idx));
+  }
+  function updatePessoa(idx, val) {
+    setPessoas(prev => prev.map((p, i) => i === idx ? val : p));
   }
 
   async function save() {
     setErr(""); setSaving(true);
     try {
       const cleanKeys = keys.filter(k => (k.cantor || "").trim() || (k.tom || "").trim());
+      // Detecta renames: para cada índice, se o nome mudou e ambos não-vazios
+      const renames = {};
+      pessoasOriginais.forEach((oldName, i) => {
+        const newName = (pessoas[i] || "").trim();
+        const oldTrim = (oldName || "").trim();
+        if (oldTrim && newName && oldTrim !== newName) {
+          renames[oldTrim] = newName;
+        }
+      });
+      const cleanedPessoas = pessoas.map(p => (p || "").trim()).filter(Boolean);
+      // Dedup mantendo ordem
+      const dedup = [];
+      cleanedPessoas.forEach(p => { if (!dedup.includes(p)) dedup.push(p); });
       await onSave({
         temas,
         override: {
@@ -138,7 +157,8 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
           tom: tom.trim(),
         },
         keys: cleanKeys,
-        pessoas,
+        pessoas: dedup,
+        renames,
       });
       onClose();
     } catch (ex) {
@@ -220,12 +240,17 @@ export function EditSongModal({ song, currentTemas, currentOverride, currentKeys
         </div>
 
         <div style={M.label}>Cantores e músicos cadastrados</div>
-        <div style={M.hint}>Esses nomes aparecem como sugestão nos campos acima.</div>
+        <div style={M.hint}>Edite o nome direto no campo para corrigir. Renomear aqui atualiza automaticamente todas as músicas que referenciam essa pessoa (Indicada por e Tom por cantor).</div>
         <div style={{marginTop: 8}}>
-          {pessoas.map(p => (
-            <div key={p} style={M.pessoaRow}>
-              <div style={{...M.pessoaInput, display:"flex", alignItems:"center"}}>{p}</div>
-              <button type="button" style={M.rowDel} onClick={() => removePessoa(p)}>✕</button>
+          {pessoas.map((p, i) => (
+            <div key={i} style={M.pessoaRow}>
+              <input
+                style={M.pessoaInput}
+                value={p}
+                onChange={e => updatePessoa(i, e.target.value)}
+                placeholder="Nome do cantor / músico"
+              />
+              <button type="button" style={M.rowDel} onClick={() => removePessoa(i)} title="Remover">✕</button>
             </div>
           ))}
           <div style={M.pessoaRow}>
