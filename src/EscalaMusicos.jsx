@@ -4,8 +4,8 @@ import SiteHeader from "./SiteHeader.jsx";
 // ─── DEFAULT DATA ────────────────────────────────────────────────────────────
 const DEFAULT_MUSICIANS = [
   { id: "hugo", name: "Hugo Luigi", short: "Hugo", roles: ["vocal_principal","vocal_back","teclado","violao"], canDoubleVocalViolao: true, noFolgaRequired: true },
-  { id: "asafe", name: "Asafe", short: "Asafe", roles: ["teclado","violao","baixo","bateria"], coupleId: "jokasta" },
-  { id: "jokasta", name: "Jokasta", short: "Jokasta", roles: ["vocal_principal","vocal_back"], coupleId: "asafe" },
+  { id: "asafe", name: "Asafe", short: "Asafe", roles: ["teclado","violao","baixo","bateria"], coupleId: "jokasta", folgaLastSunday: true },
+  { id: "jokasta", name: "Jokasta", short: "Jokasta", roles: ["vocal_principal","vocal_back"], coupleId: "asafe", folgaLastSunday: true },
   { id: "matheu", name: "Matheu Emanuel", short: "Matheu", roles: ["vocal_principal","vocal_back","bateria"] },
   { id: "leandro", name: "Leandro Guimarães", short: "Leandro", roles: ["vocal_principal","vocal_back","violao","baixo"], canDoubleVocalViolao: true, coupleId: "aline" },
   { id: "aline", name: "Aline Guimarães", short: "Aline", roles: ["vocal_principal","vocal_back"], coupleId: "leandro" },
@@ -14,7 +14,7 @@ const DEFAULT_MUSICIANS = [
   { id: "josh", name: "Josh", short: "Josh", roles: ["bateria"] },
   { id: "ana", name: "Ana Tiscianeli", short: "Ana", roles: ["vocal_principal","vocal_back"], maxPerMonth: 1 },
   { id: "clivison", name: "Clivison", short: "Clivison", roles: ["vocal_principal","vocal_back"] },
-  { id: "madalena", name: "Madalena", short: "Madalena", roles: ["vocal_principal","vocal_back"], alternating: true },
+  { id: "madalena", name: "Madalena", short: "Madalena", roles: ["vocal_principal","vocal_back"], unavailableThirdSunday: true },
 ];
 // ─── VOCALIST COLORS ────────────────────────────────────────────────────────
 const VOCALIST_COLORS = {
@@ -136,9 +136,9 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
     }
   }
 
-  // 1b. Alternating musicians (e.g., Madalena): off every other Sunday
-  autoMusicians.filter(m => m.alternating).forEach(m => {
-    for (let si = 1; si < total; si += 2) avail[si].delete(m.id);
+  // 1b. Musicians unavailable on the 3rd Sunday of the month (e.g., Madalena)
+  autoMusicians.filter(m => m.unavailableThirdSunday).forEach(m => {
+    if (total >= 3) avail[2].delete(m.id); // index 2 = 3rd Sunday
   });
 
   // 1c. maxPerMonth musicians (e.g., Ana: plays only 1 Sunday)
@@ -152,11 +152,24 @@ function generateSchedule(sundays, inputLeadRotation, musicians, leadVocalists, 
     }
   });
 
+  // 1c.5. folgaLastSunday: Asafe & Jokasta must always be off on the last Sunday of the month
+  autoMusicians.filter(m => m.folgaLastSunday).forEach(m => {
+    avail[total - 1].delete(m.id);
+  });
+  // Re-enforce couple constraint for the last Sunday after forcing these musicians off
+  autoMusicians.forEach(m => {
+    if (!m.coupleId) return;
+    const iIn = avail[total - 1].has(m.id);
+    const partnerIn = avail[total - 1].has(m.coupleId);
+    if (iIn && !partnerIn) avail[total - 1].delete(m.id);
+    if (!iIn && partnerIn) avail[total - 1].delete(m.coupleId);
+  });
+
   // 1d. Build couple/individual groups that need folga
   const groups = [];
   const seen = new Set();
   autoMusicians.forEach(m => {
-    if (seen.has(m.id) || m.noFolgaRequired || m.alternating || m.maxPerMonth) {
+    if (seen.has(m.id) || m.noFolgaRequired || m.maxPerMonth) {
       seen.add(m.id);
       return;
     }
@@ -425,6 +438,14 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, lea
       });
     }
   }
+  // Check folgaLastSunday rule (Asafe & Jokasta must be off on the last Sunday)
+  const lastSundayIdx = totalSundays - 1;
+  musicians.forEach(m => {
+    if (m.folgaLastSunday && (sundaysByMusician[m.id] || []).includes(lastSundayIdx)) {
+      conflicts.push({ type: "folga_last_sunday", severity: "error",
+        msg: `${m.name} deve ter folga no último domingo do mês (domingo ${lastSundayIdx + 1})` });
+    }
+  });
   musicians.forEach(m => {
     const count = (sundaysByMusician[m.id] || []).length;
     const offWeeks = totalSundays - count;
@@ -434,13 +455,9 @@ function analyzeConflicts(schedule, sundays, leadRotationHistory, musicians, lea
     if (m.maxPerMonth && count > m.maxPerMonth) {
       conflicts.push({ type: "ana_limit", severity: "error", msg: `${m.name} escalada ${count}x (máximo ${m.maxPerMonth}x/mês)` });
     }
-    if (m.alternating) {
-      const suns = (sundaysByMusician[m.id] || []).sort();
-      for (let i = 1; i < suns.length; i++) {
-        if (suns[i] - suns[i-1] === 1) {
-          conflicts.push({ type: "madalena", severity: "error", msg: `${m.name} escalada em domingos consecutivos (dom ${suns[i-1]+1} e ${suns[i]+1})` });
-          break;
-        }
+    if (m.unavailableThirdSunday && totalSundays >= 3) {
+      if ((sundaysByMusician[m.id] || []).includes(2)) {
+        conflicts.push({ type: "madalena_third", severity: "error", msg: `${m.name} está escalada no 3º domingo do mês mas está indisponível nesse domingo` });
       }
     }
   });
@@ -1219,7 +1236,7 @@ export default function EscalaMusicos() {
                         <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)", marginBottom:"10px" }}>
                           {m.name !== m.short ? m.name.replace(m.short,"").trim() : ""}
                           {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> {"\u2022"} máx {m.maxPerMonth}x</span>}
-                          {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
+                          {m.unavailableThirdSunday && <span style={{ color:"#c9a96e" }}> {"\u2022"} indispon\u00edvel 3\u00ba dom</span>}
                           {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
                           {blockedCount > 0 && <span style={{ color:"#ff8c69" }}> {"\u2022"} {blockedCount} bloqueio{blockedCount>1?"s":""}</span>}
                           {m.manualOnly && <span style={{ color:"#ff8c69" }}> {"\u2022"} manual</span>}
@@ -1373,7 +1390,7 @@ export default function EscalaMusicos() {
                       <div style={{ fontSize:"10px", color:"rgba(255,255,255,0.35)", marginBottom:"10px" }}>
                         {m.name !== m.short ? m.name.replace(m.short,"").trim() : ""}
                         {m.maxPerMonth && <span style={{ color:"#c9a96e" }}> {"\u2022"} máx {m.maxPerMonth}x</span>}
-                        {m.alternating && <span style={{ color:"#c9a96e" }}> {"\u2022"} alternado</span>}
+                        {m.unavailableThirdSunday && <span style={{ color:"#c9a96e" }}> {"\u2022"} indispon\u00edvel 3\u00ba dom</span>}
                         {m.coupleId && <span style={{ color:"#aaa8ff" }}> {"\u2022"} casal</span>}
                         {blockedCount > 0 && <span style={{ color:"#ff8c69" }}> {"\u2022"} {blockedCount} bloqueio{blockedCount>1?"s":""}</span>}
                         {m.manualOnly && <span style={{ color:"#ff8c69" }}> {"\u2022"} manual</span>}
@@ -2201,7 +2218,8 @@ export default function EscalaMusicos() {
               {[
                 "Cada músico deve ter pelo menos 1 folga por mês (exceto Hugo Luigi)",
                 "Ana Tiscianeli: máximo 1x por mês",
-                "Madalena: domingos alternados (1 sim, 1 não)",
+                "Madalena: indisponível no 3º domingo do mês",
+                "Asafe & Jokasta: SEMPRE folga no último domingo do mês",
                 "Casais Asafe/Jokasta e Leandro/Aline: SEMPRE folga juntos",
                 "Lead Vocal: todos devem liderar antes de alguém repetir (bloqueados não contam como pulados)",
                 "Hugo e Leandro: quando vocal, automaticamente no violão (se não precisar cobrir teclado)",
