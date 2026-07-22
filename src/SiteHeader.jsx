@@ -20,9 +20,11 @@ const H = {
     borderBottom: "1px solid #eef1f4",
   },
   inner: {
-    margin: "0 auto", padding: "0 20px", height: 60,
-    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
+    margin: "0 auto", padding: "9px 20px", minHeight: 60,
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+    gap: 16, rowGap: 8, flexWrap: "wrap",
   },
+  navWrap: { display: "flex", justifyContent: "center" },
   brand: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
   logo: {
     width: 30, height: 30, borderRadius: 8, background: "#047857",
@@ -165,33 +167,41 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
             </div>
           </div>
 
-          <nav style={H.nav}>
-            <button type="button"
-              style={{ ...H.navBtn, ...(current === "repertorio" ? H.navActive : {}) }}
-              onClick={() => { if (current !== "repertorio") navigate("/"); }}>
-              Repertório
-            </button>
-            <button type="button"
-              style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}
-              onClick={() => { if (current !== "conferencia") navigate("/conferencia"); }}>
-              Conferência
-            </button>
-          </nav>
+          <div className="hdr-nav" style={H.navWrap}>
+            <nav style={H.nav}>
+              <button type="button"
+                style={{ ...H.navBtn, ...(current === "repertorio" ? H.navActive : {}) }}
+                onClick={() => { if (current !== "repertorio") navigate("/"); }}>
+                Repertório
+              </button>
+              <button type="button"
+                style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}
+                onClick={() => { if (current !== "conferencia") navigate("/conferencia"); }}>
+                Conferência
+              </button>
+            </nav>
+          </div>
 
           {hasActions ? (
             <div style={H.right}>
               {admin ? (
                 <>
-                  {onAddSong && <button type="button" style={H.btn} className="hdr-btn" onClick={onAddSong}>+ Nova música</button>}
+                  {onAddSong && (
+                    <button type="button" style={H.btn} className="hdr-btn" onClick={onAddSong}>
+                      <span className="lbl-full">+ Nova música</span><span className="lbl-short">+ Nova</span>
+                    </button>
+                  )}
                   {onHistory && <button type="button" style={H.btn} className="hdr-btn" onClick={onHistory}>Histórico</button>}
-                  <button type="button" style={H.adminOn} className="hdr-btn" onClick={handleLogout} title="Sair do modo admin">✓ Admin · Sair</button>
+                  <button type="button" style={H.adminOn} className="hdr-btn" onClick={handleLogout} title="Sair do modo admin">
+                    <span className="lbl-full">✓ Admin · Sair</span><span className="lbl-short">Sair</span>
+                  </button>
                 </>
               ) : (
                 <button type="button" style={H.btn} className="outline-btn hdr-btn" onClick={() => setShowLogin(true)}>Admin</button>
               )}
             </div>
           ) : (
-            <div style={{ width: 70 }} />
+            <div className="hdr-spacer" style={{ width: 70 }} />
           )}
         </div>
       </header>

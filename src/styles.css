@@ -32,8 +32,18 @@ input::placeholder, textarea::placeholder { color: #9aa3ad; }
 /* Âncoras da conferência não podem sumir atrás do header sticky */
 .conf-section { scroll-margin-top: 74px; }
 
-/* Header compacto no mobile */
-@media (max-width: 620px) {
+/* Labels responsivos dos botões do header (curto só no mobile) */
+.lbl-short { display: none; }
+
+/* Header compacto no mobile: nav desce para 2ª linha centralizada,
+   botões de admin encurtam para não vazarem da tela */
+@media (max-width: 640px) {
   .brand-text { display: none; }
-  .hdr-btn { padding: 8px 10px !important; }
+  .hdr-btn { padding: 8px 12px !important; }
+  .hdr-nav { order: 3; flex-basis: 100%; }
+  .hdr-spacer { display: none; }
+  .lbl-full { display: none; }
+  .lbl-short { display: inline; }
+  /* header fica com 2 linhas no mobile — âncoras da conferência não somem */
+  .conf-section { scroll-margin-top: 118px; }
 }
