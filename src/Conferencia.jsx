@@ -54,7 +54,7 @@ const DAYS = [
     cantores: ["Hugo", "Clivison", "Matheus", "Jokasta", "Aline"],
     banda: BANDA_DEMAIS,
     songs: [
-      song(1, "39_zgvLtPS4", "Fé (medley)", "Eliezer Rodrigues", "Clivison"),
+      song(1, "39_zgvLtPS4", "Fé (medley)", "Eliezer Rodrigues", "Jokasta"),
       song(2, "UBswa_bKyRg", "Freedom Reigns (Hay Libertad)", "Art Aguilera", "Matheus"),
       song(3, "n3S_01oI6Q4", "A Alegria do Senhor", "Eliezer Rodrigues", "Clivison"),
       song(4, "YuBmD6BmAs0", "Satisfaz", "André Martins", "Hugo"),
@@ -68,12 +68,12 @@ const DAYS = [
       { color: "#1F2E4F", label: "Marinho" },
       { color: "#EEE7D8", label: "Branco/Bege" },
     ],
-    cantores: ["Matheus", "Aline", "Clivison", "Jokasta"],
+    cantores: ["Matheus", "Aline", "Clivison", "Jokasta", "Bia (Filadélfia)"],
     banda: BANDA_DEMAIS,
     songs: [
       song(1, "7aeRGFV1_FU", "Há um Lugar", "Eliezer Rodrigues", "Clivison"),
       song(2, "V7DTBO7c8Yw", "Ha Ha Ha", "Eliezer Rodrigues", "Matheus"),
-      song(3, "QS04WbSnxok", "I Trust in God", "Elevation Worship", "Matheus"),
+      song(3, "QS04WbSnxok", "I Trust in God", "Elevation Worship", "Bia (Filadélfia)"),
       song(4, "gL7QZ5DLmnE", "Tudo É Possível", "Emylie Rodrigues", "Aline"),
     ],
   },
