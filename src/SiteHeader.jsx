@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { isAdmin as checkIsAdmin, adminLogin, clearAdminPassword } from "./api.js";
-import { LoginModal } from "./AdminEdit.jsx";
-import { getTheme, toggleTheme } from "./theme.js";
 
 // ─── Site-wide top header ────────────────────────────────────────────────
-// Glassmorphism navigation bar with brand, page nav, theme toggle and admin
-// pill. The Escalas button is gated behind admin login.
+// Sticky branco com blur, logo, nav pill (Repertório | Conferência) e área
+// admin à direita. O login usa o fluxo real /api/admin/login (api.js).
 
 function navigate(path) {
   if (typeof window === "undefined") return;
@@ -17,169 +15,187 @@ function navigate(path) {
 const H = {
   bar: {
     position: "sticky", top: 0, zIndex: 200,
-    padding: "12px 18px",
-    display: "flex", alignItems: "center", justifyContent: "space-between",
-    gap: 12,
-    background: "var(--surface-strong)",
-    backdropFilter: "blur(var(--blur)) saturate(160%)",
-    WebkitBackdropFilter: "blur(var(--blur)) saturate(160%)",
-    borderBottom: "1px solid var(--border)",
+    background: "rgba(255,255,255,0.94)",
+    backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+    borderBottom: "1px solid #eef1f4",
   },
-  brand: {
-    display: "flex", alignItems: "center", gap: 8,
-    fontSize: "0.88rem", fontWeight: 800, letterSpacing: "0.02em",
-    color: "var(--text)",
-    minWidth: 0, flex: "1 1 auto", overflow: "hidden",
+  inner: {
+    margin: "0 auto", padding: "0 20px", height: 60,
+    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16,
   },
-  brandText: {
-    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-    minWidth: 0,
-  },
-  brandDot: {
-    width: 28, height: 28, borderRadius: 9,
-    background: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
+  brand: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
+  logo: {
+    width: 30, height: 30, borderRadius: 8, background: "#047857",
     display: "flex", alignItems: "center", justifyContent: "center",
-    color: "#fff", fontSize: 14, fontWeight: 800,
-    boxShadow: "0 4px 12px rgba(16,185,129,0.35)",
+    color: "#fff", fontSize: 15, fontWeight: 700, flexShrink: 0,
   },
-  nav: {
-    display: "flex", gap: 4, padding: 4, borderRadius: 999,
-    background: "var(--surface)",
-    border: "1px solid var(--border)",
-    flex: "0 1 auto",
+  brandName: { fontSize: "0.85rem", fontWeight: 700, letterSpacing: "-0.01em", color: "#111418", whiteSpace: "nowrap" },
+  brandSub: { fontSize: "0.66rem", color: "#9aa3ad", whiteSpace: "nowrap" },
+  nav: { display: "flex", gap: 2, padding: 3, borderRadius: 10, background: "#f4f6f8" },
+  navBtn: {
+    padding: "7px 16px", borderRadius: 8, border: "none", background: "transparent",
+    color: "#6b7684", fontSize: "0.8rem", fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
   },
-  btn: {
-    padding: "7px 14px", borderRadius: 999, border: "none",
-    background: "transparent", color: "var(--text-muted)",
-    fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
-    display: "inline-flex", alignItems: "center", gap: 5,
-    transition: "all .18s ease",
-  },
-  btnActive: {
-    background: "var(--surface-hover)",
-    color: "var(--text)",
-    boxShadow: "var(--shadow-sm)",
+  navActive: {
+    background: "#ffffff", color: "#111418", fontWeight: 600,
+    boxShadow: "0 1px 2px rgba(17,20,24,0.06)", cursor: "default",
   },
   right: { display: "flex", gap: 8, alignItems: "center" },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 12,
-    border: "1px solid var(--border)",
-    background: "var(--surface)",
-    color: "var(--text)",
-    cursor: "pointer", display: "flex",
-    alignItems: "center", justifyContent: "center",
-    fontSize: 16, transition: "all .18s ease",
-  },
-  adminBtn: {
-    padding: "8px 14px", borderRadius: 999,
-    border: "1px solid var(--accent-border)",
-    background: "var(--accent-soft)",
-    color: "var(--accent-text)",
-    fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
-    display: "inline-flex", alignItems: "center", gap: 5,
+  btn: {
+    padding: "8px 14px", borderRadius: 10, border: "1px solid #e2e6ea",
+    background: "#ffffff", color: "#374151", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
+    whiteSpace: "nowrap",
   },
   adminOn: {
-    padding: "8px 14px", borderRadius: 999,
-    border: "1px solid var(--accent-border)",
-    background: "linear-gradient(135deg, var(--accent), var(--accent-strong))",
-    color: "#fff", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer",
-    display: "inline-flex", alignItems: "center", gap: 5,
-    boxShadow: "0 4px 12px rgba(16,185,129,0.35)",
+    padding: "8px 16px", borderRadius: 10, border: "1px solid #a7d9c4",
+    background: "#ecfdf5", color: "#047857", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
+    whiteSpace: "nowrap",
   },
 };
 
-export default function SiteHeader({ current }) {
+const L = {
+  overlay: {
+    position: "fixed", inset: 0, zIndex: 300, background: "rgba(17,20,24,0.40)",
+    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
+    display: "flex", alignItems: "center", justifyContent: "center", padding: 18,
+  },
+  box: {
+    width: "100%", maxWidth: 400, borderRadius: 20, background: "#ffffff",
+    boxShadow: "0 24px 60px rgba(17,20,24,0.18)", padding: 28, textAlign: "center",
+  },
+  icon: {
+    width: 52, height: 52, borderRadius: 16, background: "#f4f6f8",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: 22, margin: "0 auto 14px",
+  },
+  title: { fontSize: "1.1rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#111418" },
+  sub: { fontSize: "0.8rem", color: "#6b7684", marginTop: 4, marginBottom: 18 },
+  input: (error) => ({
+    width: "100%", padding: "13px 16px", borderRadius: 12,
+    border: `1px solid ${error ? "#f5c6c6" : "#e2e6ea"}`,
+    background: "#ffffff", color: "#111418", fontSize: "0.95rem", outline: "none",
+    textAlign: "center", letterSpacing: 2,
+  }),
+  err: { color: "#b91c1c", fontSize: "0.76rem", marginTop: 8 },
+  enter: {
+    width: "100%", marginTop: 14, padding: 13, borderRadius: 12, border: "none",
+    background: "#047857", color: "#fff", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer",
+  },
+  cancel: {
+    width: "100%", marginTop: 8, padding: 11, borderRadius: 12, border: "none",
+    background: "transparent", color: "#6b7684", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600,
+  },
+};
+
+export function LoginModal({ open, onClose, onLogin }) {
+  const [pw, setPw] = useState("");
+  const [err, setErr] = useState("");
+  const [loading, setLoading] = useState(false);
+  if (!open) return null;
+  async function submit(e) {
+    e.preventDefault();
+    setErr(""); setLoading(true);
+    try {
+      await onLogin(pw);
+      setPw("");
+      onClose();
+    } catch (ex) {
+      setErr(ex.message === "unauthorized" ? "Senha incorreta" : "Erro ao conectar. Tente novamente.");
+    } finally { setLoading(false); }
+  }
+  return (
+    <div style={L.overlay} className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <form style={L.box} className="modal-box" onSubmit={submit}>
+        <div style={L.icon}>🔒</div>
+        <div style={L.title}>Área administrativa</div>
+        <div style={L.sub}>Digite a senha de admin para gerenciar o repertório.</div>
+        <input
+          type="password" autoFocus placeholder="Senha de acesso"
+          style={L.input(!!err)} value={pw}
+          onChange={e => { setPw(e.target.value); setErr(""); }}
+        />
+        {err && <div style={L.err}>{err}</div>}
+        <button type="submit" className="green-btn" disabled={loading || !pw}
+          style={{ ...L.enter, opacity: (loading || !pw) ? 0.6 : 1 }}>
+          {loading ? "Entrando..." : "Entrar"}
+        </button>
+        <button type="button" style={L.cancel} onClick={onClose}>Cancelar</button>
+      </form>
+    </div>
+  );
+}
+
+export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHistory }) {
   const [admin, setAdmin] = useState(checkIsAdmin());
-  const [theme, setThemeState] = useState(getTheme());
   const [showLogin, setShowLogin] = useState(false);
-  const [pendingNav, setPendingNav] = useState(null);
 
   useEffect(() => {
     const sync = () => setAdmin(checkIsAdmin());
-    const syncTheme = () => setThemeState(getTheme());
     window.addEventListener("admin-changed", sync);
     window.addEventListener("storage", sync);
-    window.addEventListener("theme-changed", syncTheme);
     return () => {
       window.removeEventListener("admin-changed", sync);
       window.removeEventListener("storage", sync);
-      window.removeEventListener("theme-changed", syncTheme);
     };
   }, []);
-
-  function goRepertorio() {
-    if (current !== "repertorio") navigate("/repertorio");
-  }
-
-  function goEscala() {
-    if (current === "escala") return;
-    if (admin) navigate("/escala");
-    else { setPendingNav("/escala"); setShowLogin(true); }
-  }
 
   async function handleLogin(pw) {
     await adminLogin(pw);
     setAdmin(true);
-    if (pendingNav) {
-      const target = pendingNav;
-      setPendingNav(null);
-      setTimeout(() => navigate(target), 50);
-    }
   }
 
   function handleLogout() {
     clearAdminPassword();
     setAdmin(false);
-    if (current === "escala") navigate("/repertorio");
   }
 
-  function openLogin() { setPendingNav(null); setShowLogin(true); }
+  // Ações admin (Nova música / Histórico) só existem no Repertório; a
+  // Conferência mantém o header limpo com um espaçador para centralizar a nav.
+  const hasActions = !!(onAddSong || onHistory);
 
   return (
     <>
-      <div style={H.bar} className="bar-pad">
-        <div style={H.brand}>
-          <div style={H.brandDot}>♪</div>
-          <span style={H.brandText}>
-            <span className="brand-full">Verbo da Vida Music — Orlando, FL</span>
-            <span className="brand-short">Verbo Music</span>
-          </span>
-        </div>
+      <header style={H.bar}>
+        <div style={{ ...H.inner, maxWidth }}>
+          <div style={H.brand}>
+            <div style={H.logo}>♪</div>
+            <div style={{ minWidth: 0 }} className="brand-text">
+              <div style={H.brandName}>Verbo Music</div>
+              <div style={H.brandSub}>Orlando, FL</div>
+            </div>
+          </div>
 
-        <div style={H.nav} className="nav-compact">
-          <button type="button" onClick={goRepertorio}
-            style={{ ...H.btn, ...(current === "repertorio" ? H.btnActive : {}) }}>
-            Repertório
-          </button>
-          <button type="button" onClick={goEscala}
-            style={{ ...H.btn, ...(current === "escala" ? H.btnActive : {}) }}
-            title={admin ? "Abrir Escala" : "Requer senha de admin"}>
-            Escalas {!admin && <span style={{ fontSize: 11, opacity: .7 }}>🔒</span>}
-          </button>
-        </div>
+          <nav style={H.nav}>
+            <button type="button"
+              style={{ ...H.navBtn, ...(current === "repertorio" ? H.navActive : {}) }}
+              onClick={() => { if (current !== "repertorio") navigate("/"); }}>
+              Repertório
+            </button>
+            <button type="button"
+              style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}
+              onClick={() => { if (current !== "conferencia") navigate("/conferencia"); }}>
+              Conferência
+            </button>
+          </nav>
 
-        <div style={H.right}>
-          <button
-            type="button"
-            onClick={() => { toggleTheme(); setThemeState(getTheme()); }}
-            style={H.iconBtn}
-            className="icon-btn-sm"
-            title={theme === "light" ? "Mudar para escuro" : "Mudar para claro"}
-            aria-label="Alternar tema"
-          >
-            {theme === "light" ? "🌙" : "☀️"}
-          </button>
-          {admin
-            ? <button type="button" style={H.adminOn} className="admin-btn-sm" onClick={handleLogout} title="Sair do modo admin">✓ Admin</button>
-            : <button type="button" style={H.adminBtn} className="admin-btn-sm" onClick={openLogin}>🔐 Admin</button>
-          }
+          {hasActions ? (
+            <div style={H.right}>
+              {admin ? (
+                <>
+                  {onAddSong && <button type="button" style={H.btn} className="hdr-btn" onClick={onAddSong}>+ Nova música</button>}
+                  {onHistory && <button type="button" style={H.btn} className="hdr-btn" onClick={onHistory}>Histórico</button>}
+                  <button type="button" style={H.adminOn} className="hdr-btn" onClick={handleLogout} title="Sair do modo admin">✓ Admin · Sair</button>
+                </>
+              ) : (
+                <button type="button" style={H.btn} className="outline-btn hdr-btn" onClick={() => setShowLogin(true)}>Admin</button>
+              )}
+            </div>
+          ) : (
+            <div style={{ width: 70 }} />
+          )}
         </div>
-      </div>
-      <LoginModal
-        open={showLogin}
-        onClose={() => { setShowLogin(false); setPendingNav(null); }}
-        onLogin={handleLogin}
-      />
+      </header>
+      <LoginModal open={showLogin} onClose={() => setShowLogin(false)} onLogin={handleLogin} />
     </>
   );
 }
