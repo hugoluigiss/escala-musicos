@@ -39,7 +39,7 @@ const DAYS = [
       song(2, "dAbMgyF5d2c", "Deus Está Fazendo Algo Grande", "Ana Ticianeli", "Ana"),
       song(3, "vcX5ljPzIdw", "Fortaleza", "Ana Ticianeli", "Ana"),
       song(4, "S-AuwPIIaW4", "Confiar", "Ana Ticianeli", "Ana"),
-      song(5, "2xcFM9CBiOE", "Holy Forever", "Chris Tomlin", "Ana", "G"),
+      song(5, "2xcFM9CBiOE", "Holy Forever", "CeCe Winans", "Ana", "G"),
     ],
   },
   {
