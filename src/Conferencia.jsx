@@ -51,8 +51,14 @@ const DAYS = [
       { color: "#F0E7D6", label: "Creme" },
       { color: "#293B59", label: "Marinho" },
     ],
-    cantores: ["Hugo", "Clivison", "Matheus", "Jokasta", "Aline"],
-    banda: BANDA_DEMAIS,
+    cantores: ["Bia", "Victor", "Matheus"],
+    banda: [
+      { inst: "Teclado", nome: "Mário Borges" },
+      { inst: "Bateria", nome: "Pr Caio" },
+      { inst: "Baixo", nome: "Asafe" },
+      { inst: "Guitarra", nome: "Marcos" },
+      { inst: "Violão", nome: "Victor" },
+    ],
     songs: [
       song(1, "qOD9M95_fS0", "Goodbye Yesterday", "Elevation Rhythm", "", "G"),
       song(2, "wK2uxXMJ4a4", "Minha Vitória", "Eliezer Rodrigues", ""),
