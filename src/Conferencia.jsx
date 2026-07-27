@@ -54,10 +54,10 @@ const DAYS = [
     cantores: ["Hugo", "Clivison", "Matheus", "Jokasta", "Aline"],
     banda: BANDA_DEMAIS,
     songs: [
-      song(1, "39_zgvLtPS4", "Fé (medley)", "Eliezer Rodrigues", "Jokasta"),
-      song(2, "UBswa_bKyRg", "Freedom Reigns (Hay Libertad)", "Art Aguilera", "Matheus"),
-      song(3, "n3S_01oI6Q4", "A Alegria do Senhor", "Eliezer Rodrigues", "Clivison"),
-      song(4, "YuBmD6BmAs0", "Satisfaz", "André Martins", "Hugo"),
+      song(1, "qOD9M95_fS0", "Goodbye Yesterday", "Elevation Rhythm", "", "G"),
+      song(2, "wK2uxXMJ4a4", "Minha Vitória", "Eliezer Rodrigues", ""),
+      song(3, "8Nly1vFSK-E", "Seja Exaltado (Be Lifted Up)", "Bethel Music", "", "B"),
+      song(4, "QufS8jLfCj8", "Who Else", "Gateway Worship", "", "F"),
     ],
   },
   {
@@ -247,7 +247,9 @@ export default function Conferencia() {
                   <span style={{ fontWeight: 600, fontSize: "0.9rem", letterSpacing: "-0.01em", color: "#111418" }}>{s.title}</span>
                   <span style={{ fontSize: "0.76rem", color: "#6b7684" }}>{s.artist}</span>
                   <span style={{ marginTop: "auto", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
-                    <span style={{ fontSize: "0.76rem", color: "#374151" }}>Canta: <b style={{ color: "#047857" }}>{s.canta}</b></span>
+                    {s.canta
+                      ? <span style={{ fontSize: "0.76rem", color: "#374151" }}>Canta: <b style={{ color: "#047857" }}>{s.canta}</b></span>
+                      : <span />}
                     <span style={C.tomPill}>TOM <b style={{ color: "#111418", fontSize: "0.8rem" }}>{s.tom}</b></span>
                   </span>
                 </span>
