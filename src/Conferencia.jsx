@@ -60,10 +60,10 @@ const DAYS = [
       { inst: "Violão", nome: "Victor" },
     ],
     songs: [
-      song(1, "qOD9M95_fS0", "Goodbye Yesterday", "Elevation Rhythm", "", "G"),
-      song(2, "wK2uxXMJ4a4", "Minha Vitória", "Eliezer Rodrigues", ""),
-      song(3, "8Nly1vFSK-E", "Seja Exaltado (Be Lifted Up)", "Bethel Music", "", "B"),
-      song(4, "QufS8jLfCj8", "Who Else", "Gateway Worship", "", "F"),
+      song(1, "qOD9M95_fS0", "Goodbye Yesterday", "Elevation Rhythm", "Vozes", "G"),
+      song(2, "wK2uxXMJ4a4", "Minha Vitória", "Eliezer Rodrigues", "Vozes"),
+      song(3, "8Nly1vFSK-E", "Seja Exaltado (Be Lifted Up)", "Bethel Music", "Vozes", "B"),
+      song(4, "QufS8jLfCj8", "Who Else", "Gateway Worship", "Vozes", "F"),
     ],
   },
   {
