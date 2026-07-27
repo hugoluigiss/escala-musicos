@@ -71,8 +71,8 @@ const DAYS = [
     cantores: ["Matheus", "Aline", "Clivison", "Jokasta"],
     banda: BANDA_DEMAIS,
     songs: [
-      song(1, "7aeRGFV1_FU", "Há um Lugar", "Eliezer Rodrigues", "Clivison"),
-      song(2, "V7DTBO7c8Yw", "Ha Ha Ha", "Eliezer Rodrigues", "Matheus"),
+      song(1, "V7DTBO7c8Yw", "Ha Ha Ha", "Eliezer Rodrigues", "Matheus"),
+      song(2, "n3S_01oI6Q4", "A Alegria do Senhor", "Eliezer Rodrigues", "Clivison"),
       song(3, "QS04WbSnxok", "I Trust in God", "Elevation Worship", "Matheus"),
       song(4, "gL7QZ5DLmnE", "Tudo É Possível", "Emylie Rodrigues", "Aline"),
     ],
