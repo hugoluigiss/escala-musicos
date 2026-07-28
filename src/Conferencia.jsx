@@ -26,6 +26,7 @@ const BANDA_DEMAIS = [
 const DAYS = [
   {
     anchor: "sexta", tag: "Dia 1", title: "Sexta-feira", accent: "#8A63D0",
+    ensaio: "5:30 pm", culto: "7:30 pm",
     dress: "Uma peça amarela", photo: "/dresscode-sexta.jpg",
     swatches: [
       { color: "#EAC94F", label: "Amarelo" },
@@ -44,6 +45,7 @@ const DAYS = [
   },
   {
     anchor: "sab-manha", tag: "Dia 2", title: "Sábado — Manhã", accent: "#C8783C",
+    ensaio: "8:00 am", culto: "10:00 am",
     dress: "Uma peça laranja ou terracota", photo: "/dresscode-sabado-manha.jpg",
     swatches: [
       { color: "#B85E33", label: "Terracota" },
@@ -68,6 +70,7 @@ const DAYS = [
   },
   {
     anchor: "sab-noite", tag: "Dia 2", title: "Sábado — Noite", accent: "#3E6EA5",
+    ensaio: "5:30 pm", culto: "7:30 pm",
     dress: "Uma peça azul (claro ou marinho)", photo: "/dresscode-sabado-noite.jpg",
     swatches: [
       { color: "#A3C0DE", label: "Azul claro" },
@@ -85,6 +88,7 @@ const DAYS = [
   },
   {
     anchor: "domingo", tag: "Dia 3", title: "Domingo — Manhã", accent: "#7C9166",
+    ensaio: "9:00 am", culto: "11:00 am",
     dress: "Uma peça sage green", photo: "/dresscode-domingo.jpg",
     swatches: [
       { color: "#96A784", label: "Sage green" },
@@ -200,6 +204,23 @@ export default function Conferencia() {
             <span style={C.dayTag(d.accent)}>{d.tag}</span>
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#111418" }}>{d.title}</h2>
           </div>
+
+          {(d.ensaio || d.culto) && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
+              {d.ensaio && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, background: d.accent, color: "#ffffff", boxShadow: "0 3px 10px rgba(17,20,24,0.14)" }}>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0.92 }}>🎧 Ensaio</span>
+                  <b style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>{d.ensaio}</b>
+                </span>
+              )}
+              {d.culto && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, background: "#ffffff", border: "1px solid #e2e6ea", color: "#111418" }}>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#9aa3ad" }}>⛪ Culto</span>
+                  <b style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>{d.culto}</b>
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Dress code do vocal */}
           <div style={{ border: "1px solid #eef1f4", borderLeft: `4px solid ${d.accent}`, borderRadius: 14, padding: "14px 18px", marginTop: 16 }}>
