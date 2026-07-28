@@ -28,6 +28,7 @@ input::placeholder, textarea::placeholder { color: #9aa3ad; }
 .conf-card:hover { border-color: #c9d2da !important; box-shadow: 0 8px 24px rgba(17, 20, 24, 0.08); }
 .outline-btn:hover { border-color: #047857 !important; color: #047857 !important; }
 .green-btn:hover { background: #065f46 !important; }
+.prog-link:hover { color: #047857 !important; }
 
 /* Âncoras da conferência não podem sumir atrás do header sticky */
 .conf-section { scroll-margin-top: 74px; }

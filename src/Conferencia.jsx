@@ -26,7 +26,7 @@ const BANDA_DEMAIS = [
 const DAYS = [
   {
     anchor: "sexta", tag: "Dia 1", title: "Sexta-feira", accent: "#8A63D0",
-    ensaio: "5:30 pm", culto: "7:30 pm",
+    ensaioIni: "5:30 pm", ensaioFim: "7:10 pm", culto: "7:30 pm",
     dress: "Uma peça amarela", photo: "/dresscode-sexta.jpg",
     swatches: [
       { color: "#EAC94F", label: "Amarelo" },
@@ -45,7 +45,7 @@ const DAYS = [
   },
   {
     anchor: "sab-manha", tag: "Dia 2", title: "Sábado — Manhã", accent: "#C8783C",
-    ensaio: "8:00 am", culto: "10:00 am",
+    ensaioIni: "8:00 am", ensaioFim: "9:40 am", culto: "10:00 am",
     dress: "Uma peça laranja ou terracota", photo: "/dresscode-sabado-manha.jpg",
     swatches: [
       { color: "#B85E33", label: "Terracota" },
@@ -70,7 +70,7 @@ const DAYS = [
   },
   {
     anchor: "sab-noite", tag: "Dia 2", title: "Sábado — Noite", accent: "#3E6EA5",
-    ensaio: "5:30 pm", culto: "7:30 pm",
+    ensaioIni: "5:30 pm", ensaioFim: "7:10 pm", culto: "7:30 pm",
     dress: "Uma peça azul (claro ou marinho)", photo: "/dresscode-sabado-noite.jpg",
     swatches: [
       { color: "#A3C0DE", label: "Azul claro" },
@@ -88,7 +88,7 @@ const DAYS = [
   },
   {
     anchor: "domingo", tag: "Dia 3", title: "Domingo — Manhã", accent: "#7C9166",
-    ensaio: "9:00 am", culto: "11:00 am",
+    ensaioIni: "9:00 am", ensaioFim: "10:40 am", culto: "11:00 am",
     dress: "Uma peça sage green", photo: "/dresscode-domingo.jpg",
     swatches: [
       { color: "#96A784", label: "Sage green" },
@@ -164,6 +164,9 @@ const C = {
 };
 
 export default function Conferencia() {
+  const progTh = { textAlign: "left", padding: "10px 14px", fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9aa3ad", whiteSpace: "nowrap" };
+  const progTdDia = { padding: "12px 14px", whiteSpace: "nowrap" };
+  const progTd = { padding: "12px 14px", fontSize: "0.84rem", color: "#374151", whiteSpace: "nowrap" };
   return (
     <div style={C.page}>
       <SiteHeader current="conferencia" maxWidth={1080} />
@@ -173,11 +176,38 @@ export default function Conferencia() {
         <div style={C.eyebrow}>Equipe de Louvor · América do Norte 2026</div>
         <h1 style={C.h1}>Conferência de Ministros</h1>
         <p style={C.sub}>Repertório e dress code. Clique na música para abrir no YouTube — tons a confirmar.</p>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 20 }}>
-          <a href="#sexta" style={C.anchorPill} className="outline-btn">Sexta-feira</a>
-          <a href="#sab-manha" style={C.anchorPill} className="outline-btn">Sábado — Manhã</a>
-          <a href="#sab-noite" style={C.anchorPill} className="outline-btn">Sábado — Noite</a>
-          <a href="#domingo" style={C.anchorPill} className="outline-btn">Domingo — Manhã</a>
+        <div style={{ border: "1px solid #eef1f4", borderRadius: 16, overflow: "hidden", marginTop: 20 }}>
+          <div style={{ padding: "12px 18px", borderBottom: "1px solid #eef1f4", background: "#fafbfc", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "#047857" }}>Programação</span>
+            <span style={{ fontSize: "0.72rem", color: "#9aa3ad" }}>Ensaio começa 2h antes · encerra 20 min antes do culto</span>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 480 }}>
+              <thead>
+                <tr>
+                  <th style={progTh}>Dia</th>
+                  <th style={progTh}>Ensaio · início</th>
+                  <th style={progTh}>Ensaio · encerra</th>
+                  <th style={progTh}>Culto</th>
+                </tr>
+              </thead>
+              <tbody>
+                {DAYS.map(d => (
+                  <tr key={d.anchor} style={{ borderTop: "1px solid #f4f6f8" }}>
+                    <td style={progTdDia}>
+                      <a href={`#${d.anchor}`} className="prog-link" style={{ display: "inline-flex", alignItems: "center", gap: 8, color: "#111418", fontWeight: 600, fontSize: "0.86rem" }}>
+                        <span style={{ width: 9, height: 9, borderRadius: "50%", background: d.accent, flexShrink: 0 }} />
+                        {d.title}
+                      </a>
+                    </td>
+                    <td style={progTd}><b style={{ color: d.accent }}>{d.ensaioIni}</b></td>
+                    <td style={progTd}>{d.ensaioFim}</td>
+                    <td style={progTd}><b style={{ color: "#111418" }}>{d.culto}</b></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         {/* Dress code dos músicos — todos os dias */}
@@ -205,12 +235,12 @@ export default function Conferencia() {
             <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#111418" }}>{d.title}</h2>
           </div>
 
-          {(d.ensaio || d.culto) && (
+          {(d.ensaioIni || d.culto) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-              {d.ensaio && (
+              {d.ensaioIni && (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, background: d.accent, color: "#ffffff", boxShadow: "0 3px 10px rgba(17,20,24,0.14)" }}>
                   <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0.92 }}>🎧 Ensaio</span>
-                  <b style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>{d.ensaio}</b>
+                  <b style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>{d.ensaioIni} – {d.ensaioFim}</b>
                 </span>
               )}
               {d.culto && (
