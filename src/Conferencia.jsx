@@ -69,7 +69,7 @@ const DAYS = [
       { color: "#F0E7D6", label: "Creme" },
       { color: "#293B59", label: "Marinho" },
     ],
-    cantores: ["Bia", "Victor", "Matheus"],
+    cantores: ["Bia", "Victor", "Matheus", "Hugo", "Jokasta"],
     banda: [
       { inst: "Teclado", nome: "Mário Borges" },
       { inst: "Bateria", nome: "Pr Caio" },
