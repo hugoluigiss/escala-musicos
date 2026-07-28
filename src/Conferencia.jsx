@@ -35,7 +35,7 @@ const DAYS = [
     cantores: ["Ana", "Madalena", "Jokasta", "Clivison", "Hugo"],
     banda: BANDA_SEXTA,
     songs: [
-      song(1, "vt9Nyube_gs", "Correndo a Carreira", "Eliezer Rodrigues", "Clivison", "C"),
+      song(1, "7aeRGFV1_FU", "Há um Lugar", "Eliezer Rodrigues", "Clivison", "E"),
       song(2, "dAbMgyF5d2c", "Deus Está Fazendo Algo Grande", "Ana Ticianeli", "Ana", "C"),
       song(3, "vcX5ljPzIdw", "Fortaleza", "Ana Ticianeli", "Ana", "E"),
       song(4, "S-AuwPIIaW4", "Confiar", "Ana Ticianeli", "Ana", "C"),
