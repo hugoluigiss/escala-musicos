@@ -8,6 +8,22 @@ const yt = (id) => `https://www.youtube.com/watch?v=${id}`;
 const img = (id) => `https://i.ytimg.com/vi/${id}/hqdefault.jpg`;
 const song = (n, id, title, artist, canta, tom) => ({ n, id, url: yt(id), img: img(id), title, artist, canta, tom: tom || "—" });
 
+// Texto legível sobre uma cor de acento: escuro em acentos claros (ex: amarelo), branco nos escuros.
+const inkOn = (hex) => {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) > 150 ? "#111418" : "#ffffff";
+};
+
+// Versão da cor de acento legível como TEXTO sobre fundo branco (escurece se for clara).
+const accentInk = (hex) => {
+  const h = hex.replace("#", "");
+  let r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16);
+  if ((0.299 * r + 0.587 * g + 0.114 * b) <= 150) return hex;
+  r = Math.round(r * 0.62); g = Math.round(g * 0.62); b = Math.round(b * 0.62);
+  return `#${[r, g, b].map(x => x.toString(16).padStart(2, "0")).join("")}`;
+};
+
 const BANDA_SEXTA = [
   { inst: "Teclado", nome: "Natan" },
   { inst: "Bateria", nome: "Asafe" },
@@ -25,7 +41,7 @@ const BANDA_DEMAIS = [
 
 const DAYS = [
   {
-    anchor: "sexta", tag: "Dia 1", title: "Sexta-feira", accent: "#8A63D0",
+    anchor: "sexta", tag: "Dia 1", title: "Sexta-feira", accent: "#EAC94F",
     ensaioIni: "5:30 pm", ensaioFim: "7:10 pm", culto: "7:30 pm",
     dress: "Uma peça amarela", photo: "/dresscode-sexta.jpg",
     swatches: [
@@ -130,7 +146,7 @@ const C = {
   },
   kicker: (color) => ({ fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color }),
   dayTag: (accent) => ({
-    fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.08em", color: "#ffffff",
+    fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.08em", color: inkOn(accent),
     background: accent, padding: "4px 10px", borderRadius: 6, textTransform: "uppercase",
   }),
   card: { border: "1px solid #eef1f4", borderRadius: 14, padding: "12px 16px", flex: "1 1 300px" },
@@ -200,7 +216,7 @@ export default function Conferencia() {
                         {d.title}
                       </a>
                     </td>
-                    <td style={progTd}><b style={{ color: d.accent }}>{d.ensaioIni}</b></td>
+                    <td style={progTd}><b style={{ color: accentInk(d.accent) }}>{d.ensaioIni}</b></td>
                     <td style={progTd}>{d.ensaioFim}</td>
                     <td style={progTd}><b style={{ color: "#111418" }}>{d.culto}</b></td>
                   </tr>
@@ -238,8 +254,8 @@ export default function Conferencia() {
           {(d.ensaioIni || d.culto) && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 14 }}>
               {d.ensaioIni && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, background: d.accent, color: "#ffffff", boxShadow: "0 3px 10px rgba(17,20,24,0.14)" }}>
-                  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0.92 }}>🎧 Ensaio</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "9px 15px", borderRadius: 10, background: d.accent, color: inkOn(d.accent), boxShadow: "0 3px 10px rgba(17,20,24,0.14)" }}>
+                  <span style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", opacity: 0.75 }}>🎧 Ensaio</span>
                   <b style={{ fontSize: "0.95rem", letterSpacing: "-0.01em" }}>{d.ensaioIni} – {d.ensaioFim}</b>
                 </span>
               )}
