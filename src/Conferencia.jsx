@@ -263,25 +263,31 @@ export default function Conferencia() {
           <span style={{ fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.08em", color: "#ffffff", background: "#047857", padding: "4px 10px", borderRadius: 6, textTransform: "uppercase" }}>Palco</span>
           <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#111418" }}>Posicionamento no palco</h2>
         </div>
-        <p style={{ fontSize: "0.85rem", color: "#6b7684", marginTop: 8, maxWidth: 560 }}>Vista de cima — a plateia fica na frente (embaixo). Bateria à esquerda, teclado à direita.</p>
+        <p style={{ fontSize: "0.85rem", color: "#6b7684", marginTop: 8, maxWidth: 640 }}>Vista de cima — a plateia fica na frente (embaixo). Bateria e baixo à esquerda; teclado e guitarra à direita; os 5 vocais na frente (o da ponta direita toca violão).</p>
 
-        <div style={{ marginTop: 16, border: "1px solid #eef1f4", borderRadius: 16, background: "#fafbfc", padding: 18, maxWidth: 720 }}>
-          <div style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9aa3ad", background: "#eef1f4", borderRadius: 10, padding: "8px 10px" }}>
-            🖥️ Fundo · Telão / LED
+        <div style={{ marginTop: 16, border: "1px solid #eef1f4", borderRadius: 16, background: "#fafbfc", padding: 18, maxWidth: 900 }}>
+          <div style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: 640 }}>
+              <div style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9aa3ad", background: "#eef1f4", borderRadius: 10, padding: "8px 10px" }}>
+                🖥️ Fundo · Telão / LED
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 10 }}>
+                {spot("🥁", "Bateria", "no acrílico")}
+                {spot("🎸", "Baixo", "")}
+                <div />
+                {spot("🎹", "Teclado", "")}
+                {spot("🎸", "Guitarra", "")}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10, marginTop: 10 }}>
+                {spotVoc("🎤", "Vocal 1", "")}
+                {spotVoc("🎤", "Vocal 2", "")}
+                {spotVoc("🎤", "Vocal 3", "")}
+                {spotVoc("🎤", "Vocal 4", "")}
+                {spotVoc("🎤🎸", "Vocal + Violão", "")}
+              </div>
+              <div style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600, color: "#9aa3ad", marginTop: 12 }}>▼ Frente do palco · Plateia</div>
+            </div>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
-            {spot("🥁", "Bateria", "Esquerda · no acrílico")}
-            {spot("🎹", "Teclado", "Direita")}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 10 }}>
-            {spot("🎸", "Guitarra", "")}
-            {spot("🎸", "Violão", "")}
-            {spot("🎸", "Baixo", "")}
-          </div>
-          <div style={{ marginTop: 10 }}>
-            {spotVoc("🎤", "Vocais", "Frente do palco")}
-          </div>
-          <div style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600, color: "#9aa3ad", marginTop: 12 }}>▼ Frente do palco · Plateia</div>
         </div>
       </section>
 
