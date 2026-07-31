@@ -183,6 +183,20 @@ export default function Conferencia() {
   const progTh = { textAlign: "left", padding: "10px 14px", fontSize: "0.64rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "#9aa3ad", whiteSpace: "nowrap" };
   const progTdDia = { padding: "12px 14px", whiteSpace: "nowrap" };
   const progTd = { padding: "12px 14px", fontSize: "0.84rem", color: "#374151", whiteSpace: "nowrap" };
+  const spot = (icon, role, note) => (
+    <div style={{ background: "#ffffff", border: "1px solid #e2e6ea", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+      <div style={{ fontSize: 20, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "#111418", marginTop: 4 }}>{role}</div>
+      {note ? <div style={{ fontSize: "0.66rem", color: "#9aa3ad", marginTop: 2 }}>{note}</div> : null}
+    </div>
+  );
+  const spotVoc = (icon, role, note) => (
+    <div style={{ background: "#ecfdf5", border: "1px solid #a7d9c4", borderRadius: 12, padding: "12px 10px", textAlign: "center" }}>
+      <div style={{ fontSize: 20, lineHeight: 1 }}>{icon}</div>
+      <div style={{ fontSize: "0.85rem", fontWeight: 700, color: "#047857", marginTop: 4 }}>{role}</div>
+      {note ? <div style={{ fontSize: "0.66rem", color: "#6b7684", marginTop: 2 }}>{note}</div> : null}
+    </div>
+  );
   return (
     <div style={C.page}>
       <SiteHeader current="conferencia" maxWidth={1080} />
@@ -240,6 +254,34 @@ export default function Conferencia() {
             </span>
             <a href="/dresscode-musicos.jpg" target="_blank" rel="noopener noreferrer" style={C.exemplosBtn} className="outline-btn">Ver exemplos ↗</a>
           </div>
+        </div>
+      </section>
+
+      {/* Posicionamento no palco */}
+      <section style={{ maxWidth: 1080, margin: "0 auto", padding: "44px 20px 0" }} className="conf-section">
+        <div style={{ display: "flex", alignItems: "baseline", gap: 12, borderLeft: "4px solid #047857", paddingLeft: 14 }}>
+          <span style={{ fontSize: "0.66rem", fontWeight: 700, letterSpacing: "0.08em", color: "#ffffff", background: "#047857", padding: "4px 10px", borderRadius: 6, textTransform: "uppercase" }}>Palco</span>
+          <h2 style={{ fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", color: "#111418" }}>Posicionamento no palco</h2>
+        </div>
+        <p style={{ fontSize: "0.85rem", color: "#6b7684", marginTop: 8, maxWidth: 560 }}>Vista de cima — a plateia fica na frente (embaixo). Bateria à esquerda, teclado à direita.</p>
+
+        <div style={{ marginTop: 16, border: "1px solid #eef1f4", borderRadius: 16, background: "#fafbfc", padding: 18, maxWidth: 720 }}>
+          <div style={{ textAlign: "center", fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9aa3ad", background: "#eef1f4", borderRadius: 10, padding: "8px 10px" }}>
+            🖥️ Fundo · Telão / LED
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginTop: 10 }}>
+            {spot("🥁", "Bateria", "Esquerda · no acrílico")}
+            {spot("🎹", "Teclado", "Direita")}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginTop: 10 }}>
+            {spot("🎸", "Guitarra", "")}
+            {spot("🎸", "Violão", "")}
+            {spot("🎸", "Baixo", "")}
+          </div>
+          <div style={{ marginTop: 10 }}>
+            {spotVoc("🎤", "Vocais", "Frente do palco")}
+          </div>
+          <div style={{ textAlign: "center", fontSize: "0.72rem", fontWeight: 600, color: "#9aa3ad", marginTop: 12 }}>▼ Frente do palco · Plateia</div>
         </div>
       </section>
 
