@@ -114,10 +114,10 @@ const DAYS = [
     cantores: ["Madalena", "Aline", "Jokasta", "Clivison", "Hugo"],
     banda: BANDA_DEMAIS,
     songs: [
-      song(1, "ULUYuQ4ZWwM", "Óleo de Alegria", "Alda Célia", "Madalena"),
-      song(2, "bxMzZVfh7zc", "Canção Ao Cordeiro", "Eliezer Rodrigues", "Madalena"),
-      song(3, "QIuVWpLLYy8", "Novo e Vivo Caminho", "MVV", "Clivison"),
-      song(4, "5MwyYi9OYow", "Redimido", "Bruna Olly e Júlia Vitória", "Madalena"),
+      song(1, "ULUYuQ4ZWwM", "Óleo de Alegria", "Alda Célia", "Madalena", "A"),
+      song(2, "bxMzZVfh7zc", "Canção Ao Cordeiro", "Eliezer Rodrigues", "Madalena", "G"),
+      song(3, "QIuVWpLLYy8", "Novo e Vivo Caminho", "MVV", "Clivison", "G"),
+      song(4, "5MwyYi9OYow", "Redimido", "Bruna Olly e Júlia Vitória", "Madalena", "G"),
     ],
   },
 ];
