@@ -174,11 +174,13 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
                 onClick={() => { if (current !== "repertorio") navigate("/"); }}>
                 Repertório
               </button>
-              <button type="button"
-                style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}
-                onClick={() => { if (current !== "conferencia") navigate("/conferencia"); }}>
-                Conferência
-              </button>
+              {admin && (
+                <button type="button"
+                  style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}
+                  onClick={() => { if (current !== "conferencia") navigate("/conferencia"); }}>
+                  Conferência
+                </button>
+              )}
             </nav>
           </div>
 
