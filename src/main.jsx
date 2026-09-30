@@ -4,7 +4,7 @@ import Repertorio from './Repertorio.jsx'
 import Conferencia from './Conferencia.jsx'
 import Login from './Login.jsx'
 import { isAdmin as checkIsAdmin } from './api.js'
-import { useAuth } from './auth.js'
+import { useAuth, getAccount } from './auth.js'
 import './styles.css'
 
 function App() {
@@ -55,7 +55,14 @@ function App() {
 // (status "disabled"), o site funciona sem login, como antes.
 function AuthGate() {
   const { status } = useAuth();
-  if (status === "loading") {
+  // Espera o backend dizer se a conta é admin (evita piscar/redirecionar errado)
+  const [accountReady, setAccountReady] = useState(getAccount() !== undefined);
+  useEffect(() => {
+    const sync = () => setAccountReady(getAccount() !== undefined);
+    window.addEventListener("admin-changed", sync);
+    return () => window.removeEventListener("admin-changed", sync);
+  }, []);
+  if (status === "loading" || (status === "signed_in" && !accountReady)) {
     return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#9aa3ad", fontSize: "0.85rem" }}>Carregando...</div>;
   }
   if (status === "recovery") return <Login key="recovery" recovery />;

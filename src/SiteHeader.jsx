@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { isAdmin as checkIsAdmin, adminLogin, clearAdminPassword } from "./api.js";
+import { isAdmin as checkIsAdmin, isAccountAdminMode, adminLogin, clearAdminPassword } from "./api.js";
 import { useAuth, signOut, userDisplayName } from "./auth.js";
 
 // ─── Site-wide top header ────────────────────────────────────────────────
@@ -165,10 +165,11 @@ function UserButton() {
 
 export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHistory }) {
   const [admin, setAdmin] = useState(checkIsAdmin());
+  const [accountMode, setAccountMode] = useState(isAccountAdminMode());
   const [showLogin, setShowLogin] = useState(false);
 
   useEffect(() => {
-    const sync = () => setAdmin(checkIsAdmin());
+    const sync = () => { setAdmin(checkIsAdmin()); setAccountMode(isAccountAdminMode()); };
     window.addEventListener("admin-changed", sync);
     window.addEventListener("storage", sync);
     return () => {
@@ -230,11 +231,13 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
                     </button>
                   )}
                   {onHistory && <button type="button" style={H.btn} className="hdr-btn" onClick={onHistory}>Histórico</button>}
-                  <button type="button" style={H.adminOn} className="hdr-btn" onClick={handleLogout} title="Sair do modo admin">
-                    <span className="lbl-full">✓ Admin · Sair</span><span className="lbl-short">Sair</span>
-                  </button>
+                  {!accountMode && (
+                    <button type="button" style={H.adminOn} className="hdr-btn" onClick={handleLogout} title="Sair do modo admin">
+                      <span className="lbl-full">✓ Admin · Sair</span><span className="lbl-short">Sair</span>
+                    </button>
+                  )}
                 </>
-              ) : (
+              ) : !accountMode && (
                 <button type="button" style={H.btn} className="outline-btn hdr-btn" onClick={() => setShowLogin(true)}>Admin</button>
               )}
               <UserButton />

@@ -13,6 +13,29 @@ let clientPromise = null;
 // disparar antes do hook assinar, então guardamos o sinal aqui.
 let recoveryPending = typeof window !== "undefined" && /type=recovery/.test(window.location.hash);
 
+// Info da conta logada vinda do backend (/api/me): é admin? qual o modo?
+// undefined = ainda não carregou; null = sem conta/sem resposta.
+let account = undefined;
+
+export function getAccount() {
+  return account;
+}
+
+function setAccount(next) {
+  account = next;
+  try { window.dispatchEvent(new Event("admin-changed")); } catch {}
+}
+
+async function refreshAccount(token) {
+  if (!token) { setAccount(null); return; }
+  try {
+    const res = await fetch("/api/me", { headers: { Authorization: `Bearer ${token}` } });
+    setAccount(res.ok ? await res.json() : null);
+  } catch {
+    setAccount(null);
+  }
+}
+
 async function loadConfig() {
   const envUrl = import.meta.env.VITE_SUPABASE_URL;
   const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -34,9 +57,17 @@ export function getSupabase() {
       const sb = createClient(cfg.supabaseUrl, cfg.supabaseAnonKey, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
       });
-      sb.auth.onAuthStateChange(event => {
+      let lastUserId = null;
+      sb.auth.onAuthStateChange((event, session) => {
         if (event === "PASSWORD_RECOVERY") recoveryPending = true;
         if (event === "USER_UPDATED" || event === "SIGNED_OUT") recoveryPending = false;
+        // Busca o status de admin quando a conta muda (fora do callback do Supabase)
+        const userId = session?.user?.id || null;
+        if (userId !== lastUserId || event === "USER_UPDATED") {
+          lastUserId = userId;
+          if (userId) setAccount(undefined);
+          setTimeout(() => refreshAccount(session?.access_token), 0);
+        }
       });
       return sb;
     });

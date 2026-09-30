@@ -11,7 +11,9 @@ O site inteiro exige login: **Google** ou **email + senha** (com criar conta e "
 Configure no Railway as variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY` (Supabase → Project Settings → API).
 Sem essas variáveis o login fica desligado e o site funciona aberto, como antes.
 Com elas, o backend também exige o token do usuário em `/api/data`.
-A senha de admin continua separada: ela libera edição do repertório e a Conferência.
+**Admin por conta:** a variável `ADMIN_EMAILS` (emails separados por vírgula) define quem é admin
+(edita o repertório e vê a Conferência). O email precisa estar confirmado. Com ela configurada,
+a senha `ADMIN_PASSWORD` deixa de valer; sem ela, vale o modo antigo por senha.
 
 ## Stack
 - React + Vite (design flat branco, fonte Instrument Sans)

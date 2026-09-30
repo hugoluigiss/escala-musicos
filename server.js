@@ -25,16 +25,6 @@ const ADMIN_PROTECTED_KEYS = new Set([
   'repertorio_celebracao',
   'repertorio_history',
 ]);
-function requireAdmin(req, res, next) {
-  if (!ADMIN_PASSWORD) {
-    return res.status(503).json({ error: 'admin_password_not_set' });
-  }
-  const provided = req.headers['x-admin-password'];
-  if (!provided || provided !== ADMIN_PASSWORD) {
-    return res.status(401).json({ error: 'unauthorized' });
-  }
-  next();
-}
 
 // ─── USER AUTH (Supabase) ───────────────────────────────────────────────────
 // Set SUPABASE_URL and SUPABASE_ANON_KEY on Railway. When both are set, every
@@ -76,6 +66,30 @@ async function requireUser(req, res, next) {
     res.status(503).json({ error: 'auth_unavailable' });
   }
 }
+
+// Admins por conta: lista de emails em ADMIN_EMAILS (separados por vírgula).
+// Quando configurada (junto com o Supabase), só essas contas são admin e a
+// senha ADMIN_PASSWORD deixa de valer. O email precisa estar confirmado —
+// assim ninguém vira admin criando uma conta com o email de outra pessoa.
+const ADMIN_EMAILS = new Set(
+  (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
+);
+const ACCOUNT_ADMIN = AUTH_ENABLED && ADMIN_EMAILS.size > 0;
+
+function isAccountAdmin(user) {
+  if (!ACCOUNT_ADMIN || !user || !user.email) return false;
+  if (!user.email_confirmed_at) return false;
+  return ADMIN_EMAILS.has(user.email.toLowerCase());
+}
+
+// Quem está logado e se é admin
+app.get('/api/me', requireUser, (req, res) => {
+  res.json({
+    email: req.user ? req.user.email : null,
+    isAdmin: isAccountAdmin(req.user),
+    adminMode: ACCOUNT_ADMIN ? 'account' : 'password',
+  });
+});
 
 // Public config for the frontend (the anon key is public by design)
 app.get('/api/config', (req, res) => {
@@ -127,6 +141,8 @@ app.get('/api/data/:key', async (req, res) => {
 
 // Admin login: verify password (returns ok or 401)
 app.post('/api/admin/login', (req, res) => {
+  // Com admins por conta, a senha compartilhada não dá mais acesso
+  if (ACCOUNT_ADMIN) return res.status(401).json({ error: 'unauthorized' });
   if (!ADMIN_PASSWORD) return res.status(503).json({ error: 'admin_password_not_set' });
   const { password } = req.body || {};
   if (password === ADMIN_PASSWORD) return res.json({ ok: true });
@@ -138,7 +154,9 @@ app.put('/api/data/:key', async (req, res) => {
   try {
     const { key } = req.params;
     // Gate writes to admin-protected keys
-    if (ADMIN_PROTECTED_KEYS.has(key)) {
+    if (ADMIN_PROTECTED_KEYS.has(key) && ACCOUNT_ADMIN) {
+      if (!isAccountAdmin(req.user)) return res.status(401).json({ error: 'unauthorized' });
+    } else if (ADMIN_PROTECTED_KEYS.has(key)) {
       if (!ADMIN_PASSWORD) return res.status(503).json({ error: 'admin_password_not_set' });
       const provided = req.headers['x-admin-password'];
       if (!provided || provided !== ADMIN_PASSWORD) {

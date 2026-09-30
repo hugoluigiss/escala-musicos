@@ -4,7 +4,7 @@
 // A single password unifies the Escala admin gate and the Repertório
 // admin editing — the user only logs in once.
 
-import { getAccessToken } from "./auth.js";
+import { getAccessToken, getAccount } from "./auth.js";
 
 const ADMIN_PW_KEY = "admin_pw_v1";
 
@@ -35,7 +35,13 @@ export function clearAdminPassword() {
   try { localStorage.removeItem(ADMIN_PW_KEY); } catch {}
   notifyChanged();
 }
+// Admin por conta (ADMIN_EMAILS no backend) ou, no modo antigo, pela senha.
+export function isAccountAdminMode() {
+  return getAccount()?.adminMode === "account";
+}
 export function isAdmin() {
+  const acc = getAccount();
+  if (acc && acc.adminMode === "account") return !!acc.isAdmin;
   return !!getAdminPassword();
 }
 
