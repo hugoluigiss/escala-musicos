@@ -67,19 +67,21 @@ async function requireUser(req, res, next) {
   }
 }
 
-// Admins por conta: lista de emails em ADMIN_EMAILS (separados por vírgula).
-// Quando configurada (junto com o Supabase), só essas contas são admin e a
-// senha ADMIN_PASSWORD deixa de valer. O email precisa estar confirmado —
-// assim ninguém vira admin criando uma conta com o email de outra pessoa.
+// Admins por conta (com o Supabase ligado, a senha ADMIN_PASSWORD deixa de valer):
+//  - papel gravado no Supabase: app_metadata.role = "admin" (só muda via painel/SQL
+//    do Supabase — o usuário não consegue alterar pelo site);
+//  - ou email listado em ADMIN_EMAILS no Railway (opcional, separados por vírgula).
+// O email precisa estar confirmado — ninguém vira admin usando o email de outro.
 const ADMIN_EMAILS = new Set(
   (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
 );
-const ACCOUNT_ADMIN = AUTH_ENABLED && ADMIN_EMAILS.size > 0;
+const ACCOUNT_ADMIN = AUTH_ENABLED;
 
 function isAccountAdmin(user) {
   if (!ACCOUNT_ADMIN || !user || !user.email) return false;
   if (!user.email_confirmed_at) return false;
-  return ADMIN_EMAILS.has(user.email.toLowerCase());
+  const role = user.app_metadata && user.app_metadata.role;
+  return role === 'admin' || ADMIN_EMAILS.has(user.email.toLowerCase());
 }
 
 // Quem está logado e se é admin

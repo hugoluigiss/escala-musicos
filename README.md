@@ -11,9 +11,16 @@ O site inteiro exige login: **Google** ou **email + senha** (com criar conta e "
 Configure no Railway as variáveis `SUPABASE_URL` e `SUPABASE_ANON_KEY` (Supabase → Project Settings → API).
 Sem essas variáveis o login fica desligado e o site funciona aberto, como antes.
 Com elas, o backend também exige o token do usuário em `/api/data`.
-**Admin por conta:** a variável `ADMIN_EMAILS` (emails separados por vírgula) define quem é admin
-(edita o repertório e vê a Conferência). O email precisa estar confirmado. Com ela configurada,
-a senha `ADMIN_PASSWORD` deixa de valer; sem ela, vale o modo antigo por senha.
+**Admin por conta:** com o Supabase ligado, é admin (edita o repertório e vê a Conferência) quem tiver
+`app_metadata.role = "admin"` no Supabase — ou o email listado em `ADMIN_EMAILS` no Railway (opcional).
+O email precisa estar confirmado, e a senha `ADMIN_PASSWORD` deixa de valer. Para tornar alguém admin,
+rode no SQL Editor do Supabase:
+
+```sql
+update auth.users
+set raw_app_meta_data = raw_app_meta_data || '{"role":"admin"}'
+where email = 'email@exemplo.com';
+```
 
 ## Stack
 - React + Vite (design flat branco, fonte Instrument Sans)
