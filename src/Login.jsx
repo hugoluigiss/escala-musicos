@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   signInWithGoogle, signInWithEmail, signUpWithEmail,
-  sendPasswordReset, updatePassword, authErrorMessage,
+  sendPasswordReset, isGoogleEnabled, updatePassword, authErrorMessage,
 } from "./auth.js";
 
 // ─── Tela de login ───────────────────────────────────────────────────────
@@ -78,6 +78,13 @@ export default function Login({ recovery = false }) {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
+  const [google, setGoogle] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    isGoogleEnabled().then(on => { if (alive) setGoogle(on); });
+    return () => { alive = false; };
+  }, []);
 
   function switchMode(m) {
     setMode(m); setErr(""); setOk(""); setPassword("");
@@ -117,7 +124,7 @@ export default function Login({ recovery = false }) {
     recovery: ["Nova senha", "Digite a nova senha da sua conta."],
   };
   const [title, sub] = titles[mode];
-  const showGoogle = mode === "login" || mode === "signup";
+  const showGoogle = google && (mode === "login" || mode === "signup");
   const needsPassword = mode !== "reset";
   const canSubmit = !loading
     && (mode === "recovery" || email.trim())

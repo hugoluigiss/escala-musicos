@@ -75,6 +75,25 @@ export function getSupabase() {
   return clientPromise;
 }
 
+// Google só aparece se estiver ativado no Supabase (Authentication → Providers).
+let googlePromise = null;
+export function isGoogleEnabled() {
+  if (!googlePromise) {
+    googlePromise = loadConfig().then(async cfg => {
+      if (!cfg || !cfg.supabaseUrl || !cfg.supabaseAnonKey) return false;
+      try {
+        const res = await fetch(`${cfg.supabaseUrl}/auth/v1/settings`, { headers: { apikey: cfg.supabaseAnonKey } });
+        if (!res.ok) return false;
+        const settings = await res.json();
+        return !!(settings.external && settings.external.google);
+      } catch {
+        return false;
+      }
+    });
+  }
+  return googlePromise;
+}
+
 export async function getAccessToken() {
   const sb = await getSupabase();
   if (!sb) return null;
