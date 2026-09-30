@@ -4,7 +4,15 @@
 // A single password unifies the Escala admin gate and the Repertório
 // admin editing — the user only logs in once.
 
+import { getAccessToken } from "./auth.js";
+
 const ADMIN_PW_KEY = "admin_pw_v1";
+
+// Token do usuário logado (Supabase) — exigido pelo backend em /api/data.
+async function authHeaders() {
+  const token = await getAccessToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
 
 // Local fallback senha — só é aceita se o backend ainda não tiver
 // ADMIN_PASSWORD configurado (responde 503). Permite navegar/usar a Escala
@@ -68,7 +76,9 @@ export async function adminLogin(password) {
 
 export async function apiGet(key) {
   try {
-    const res = await fetch(`/api/data/${encodeURIComponent(key)}`);
+    const res = await fetch(`/api/data/${encodeURIComponent(key)}`, {
+      headers: await authHeaders(),
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (e) {
@@ -78,7 +88,7 @@ export async function apiGet(key) {
 }
 
 export async function apiPut(key, value) {
-  const headers = { "Content-Type": "application/json" };
+  const headers = { "Content-Type": "application/json", ...(await authHeaders()) };
   const pw = getAdminPassword();
   if (pw) headers["X-Admin-Password"] = pw;
   const res = await fetch(`/api/data/${encodeURIComponent(key)}`, {

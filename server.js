@@ -36,6 +36,57 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+// ─── USER AUTH (Supabase) ───────────────────────────────────────────────────
+// Set SUPABASE_URL and SUPABASE_ANON_KEY on Railway. When both are set, every
+// /api/data request requires a logged-in user (Authorization: Bearer <jwt>).
+// When unset, the site keeps working without login (previous behavior).
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+const AUTH_ENABLED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+// Cache de tokens já validados (evita bater no Supabase a cada request)
+const tokenCache = new Map();
+const TOKEN_CACHE_MS = 5 * 60 * 1000;
+
+async function verifyUserToken(token) {
+  const cached = tokenCache.get(token);
+  if (cached && cached.expires > Date.now()) return cached.user;
+  const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  if (tokenCache.size > 1000) tokenCache.clear();
+  tokenCache.set(token, { user, expires: Date.now() + TOKEN_CACHE_MS });
+  return user;
+}
+
+async function requireUser(req, res, next) {
+  if (!AUTH_ENABLED) return next();
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : '';
+  if (!token) return res.status(401).json({ error: 'login_required' });
+  try {
+    const user = await verifyUserToken(token);
+    if (!user) return res.status(401).json({ error: 'login_required' });
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error('Auth error:', err.message);
+    res.status(503).json({ error: 'auth_unavailable' });
+  }
+}
+
+// Public config for the frontend (the anon key is public by design)
+app.get('/api/config', (req, res) => {
+  res.json({
+    supabaseUrl: AUTH_ENABLED ? SUPABASE_URL : null,
+    supabaseAnonKey: AUTH_ENABLED ? SUPABASE_ANON_KEY : null,
+  });
+});
+
+app.use('/api/data', requireUser);
+
 // ─── DATABASE ───────────────────────────────────────────────────────────────
 const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,

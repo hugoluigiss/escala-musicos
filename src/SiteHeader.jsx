@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { isAdmin as checkIsAdmin, adminLogin, clearAdminPassword } from "./api.js";
+import { useAuth, signOut, userDisplayName } from "./auth.js";
 
 // ─── Site-wide top header ────────────────────────────────────────────────
 // Sticky branco com blur, logo, nav pill (Repertório | Conferência) e área
@@ -47,6 +48,16 @@ const H = {
     padding: "8px 14px", borderRadius: 10, border: "1px solid #e2e6ea",
     background: "#ffffff", color: "#374151", fontSize: "0.78rem", fontWeight: 600, cursor: "pointer",
     whiteSpace: "nowrap",
+  },
+  user: {
+    display: "flex", alignItems: "center", gap: 8, padding: "5px 12px 5px 5px", borderRadius: 999,
+    border: "1px solid #e2e6ea", background: "#ffffff", color: "#374151",
+    fontSize: "0.78rem", fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+  },
+  avatar: {
+    width: 24, height: 24, borderRadius: "50%", background: "#ecfdf5", color: "#047857",
+    display: "flex", alignItems: "center", justifyContent: "center",
+    fontSize: "0.72rem", fontWeight: 700, overflow: "hidden", flexShrink: 0,
   },
   adminOn: {
     padding: "8px 16px", borderRadius: 10, border: "1px solid #a7d9c4",
@@ -127,6 +138,31 @@ export function LoginModal({ open, onClose, onLogin }) {
   );
 }
 
+// Usuário logado (Supabase): avatar + "Sair". Não aparece se o login
+// estiver desligado.
+function UserButton() {
+  const { status, user } = useAuth();
+  if (status !== "signed_in" || !user) return null;
+  const name = userDisplayName(user);
+  const first = name.split(/[\s@]/)[0];
+  const photo = user.user_metadata?.avatar_url;
+  async function handleSignOut() {
+    if (!window.confirm(`Sair da conta ${user.email}?`)) return;
+    clearAdminPassword();
+    await signOut();
+  }
+  return (
+    <button type="button" style={H.user} className="outline-btn hdr-btn" onClick={handleSignOut}
+      title={`${user.email} — clique para sair`}>
+      <span style={H.avatar}>
+        {photo ? <img src={photo} alt="" referrerPolicy="no-referrer" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          : (first[0] || "?").toUpperCase()}
+      </span>
+      <span className="lbl-full">{first} · Sair</span><span className="lbl-short">Sair</span>
+    </button>
+  );
+}
+
 export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHistory }) {
   const [admin, setAdmin] = useState(checkIsAdmin());
   const [showLogin, setShowLogin] = useState(false);
@@ -201,9 +237,12 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
               ) : (
                 <button type="button" style={H.btn} className="outline-btn hdr-btn" onClick={() => setShowLogin(true)}>Admin</button>
               )}
+              <UserButton />
             </div>
           ) : (
-            <div className="hdr-spacer" style={{ width: 70 }} />
+            <div style={{ ...H.right, minWidth: 70, justifyContent: "flex-end" }}>
+              <UserButton />
+            </div>
           )}
         </div>
       </header>

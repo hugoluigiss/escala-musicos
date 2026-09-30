@@ -2,7 +2,9 @@ import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import Repertorio from './Repertorio.jsx'
 import Conferencia from './Conferencia.jsx'
+import Login from './Login.jsx'
 import { isAdmin as checkIsAdmin } from './api.js'
+import { useAuth } from './auth.js'
 import './styles.css'
 
 function App() {
@@ -49,8 +51,20 @@ function App() {
   return <Repertorio />;
 }
 
+// Só quem está logado acessa o site. Se o Supabase não estiver configurado
+// (status "disabled"), o site funciona sem login, como antes.
+function AuthGate() {
+  const { status } = useAuth();
+  if (status === "loading") {
+    return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#9aa3ad", fontSize: "0.85rem" }}>Carregando...</div>;
+  }
+  if (status === "recovery") return <Login key="recovery" recovery />;
+  if (status === "signed_out") return <Login key="login" />;
+  return <App />;
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <App />
+    <AuthGate />
   </StrictMode>,
 )
