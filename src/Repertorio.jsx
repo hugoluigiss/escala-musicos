@@ -4,7 +4,7 @@ import { apiGet, apiPut, isAdmin as checkIsAdmin } from "./api.js";
 import SiteHeader from "./SiteHeader.jsx";
 
 // ─── SONG DATA ──────────────────────────────────────────────────────────────
-const SONGS=[
+export const SONGS=[
 {num:1,musica:"Não é Homem pra Mentir",artista:"Marcos Freire",tom:"-",verbo:false,videoId:"ILy997rP3Po"},
 {num:2,musica:"A Boa Parte (Ao Vivo)",artista:"Fhop Music / Nívea Soares",tom:"-",verbo:false,videoId:"dlGOiuxSzVw"},
 {num:3,musica:"Prefiro a Tua Presença",artista:"Ana Luiza",tom:"-",verbo:false,videoId:"4grgpeRwcfg"},

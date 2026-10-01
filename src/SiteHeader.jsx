@@ -167,6 +167,7 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
   const [admin, setAdmin] = useState(checkIsAdmin());
   const [accountMode, setAccountMode] = useState(isAccountAdminMode());
   const [showLogin, setShowLogin] = useState(false);
+  const { status: authStatus } = useAuth();
 
   useEffect(() => {
     const sync = () => { setAdmin(checkIsAdmin()); setAccountMode(isAccountAdminMode()); };
@@ -211,6 +212,13 @@ export default function SiteHeader({ current, maxWidth = 960, onAddSong, onHisto
                 onClick={() => { if (current !== "repertorio") navigate("/"); }}>
                 Repertório
               </button>
+              {authStatus === "signed_in" && (
+                <button type="button"
+                  style={{ ...H.navBtn, ...(current === "sugestoes" ? H.navActive : {}) }}
+                  onClick={() => { if (current !== "sugestoes") navigate("/sugestoes"); }}>
+                  Sugestões
+                </button>
+              )}
               {admin && (
                 <button type="button"
                   style={{ ...H.navBtn, ...(current === "conferencia" ? H.navActive : {}) }}

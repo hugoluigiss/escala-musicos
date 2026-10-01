@@ -24,6 +24,7 @@ const ADMIN_PROTECTED_KEYS = new Set([
   'repertorio_deleted',
   'repertorio_celebracao',
   'repertorio_history',
+  'suggestions_config',
 ]);
 
 // ─── USER AUTH (Supabase) ───────────────────────────────────────────────────
@@ -118,6 +119,24 @@ async function initDB() {
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS song_suggestions (
+        id SERIAL PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        user_email TEXT,
+        user_name TEXT,
+        musica TEXT NOT NULL,
+        artista TEXT NOT NULL,
+        video_id TEXT NOT NULL,
+        verbo BOOLEAN NOT NULL DEFAULT FALSE,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT NOW(),
+        reviewed_at TIMESTAMP,
+        reviewed_by TEXT
+      )
+    `);
+    await pool.query('ALTER TABLE song_suggestions ADD COLUMN IF NOT EXISTS round TEXT');
+    await pool.query('CREATE INDEX IF NOT EXISTS song_suggestions_user_idx ON song_suggestions (user_id)');
     console.log('Database initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err.message);
@@ -188,6 +207,193 @@ app.get('/api/data', async (req, res) => {
     res.json(data);
   } catch (err) {
     console.error('GET all error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// ─── SUGESTÕES DE MÚSICAS ───────────────────────────────────────────────────
+// O admin abre um período de envio (data de início/fim) e define quantas
+// sugestões cada músico pode mandar nesse período. Só as pendentes podem ser
+// retiradas (liberando a vaga). Ao aprovar, o frontend do admin adiciona a
+// música ao repertório (repertorio_custom_songs).
+// Config fica em app_data['suggestions_config'] = { max, start, end } (datas
+// YYYY-MM-DD, no fuso de Orlando). O "round" identifica o período.
+const SUGGESTIONS_TZ = 'America/New_York';
+const DEFAULT_SUGGESTIONS_CONFIG = { max: 5, start: null, end: null };
+
+function todayInTz() {
+  // en-CA formata como YYYY-MM-DD
+  return new Intl.DateTimeFormat('en-CA', { timeZone: SUGGESTIONS_TZ }).format(new Date());
+}
+
+async function getSuggestionsConfig() {
+  const r = await pool.query("SELECT value FROM app_data WHERE key = 'suggestions_config'");
+  const cfg = { ...DEFAULT_SUGGESTIONS_CONFIG, ...(r.rows[0] ? r.rows[0].value : {}) };
+  const today = todayInTz();
+  const open = !!(cfg.start && cfg.end && cfg.start <= today && today <= cfg.end);
+  return { ...cfg, today, open, round: cfg.start && cfg.end ? `${cfg.start}_${cfg.end}` : null };
+}
+
+const isDate = (v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+function parseYoutubeId(raw) {
+  const s = String(raw || '').trim();
+  const m = s.match(/(?:v=|youtu\.be\/|embed\/|shorts\/|live\/)([\w-]{11})/);
+  if (m) return m[1];
+  return /^[\w-]{11}$/.test(s) ? s : null;
+}
+
+function suggestionRow(r) {
+  return {
+    id: r.id, musica: r.musica, artista: r.artista, videoId: r.video_id, verbo: r.verbo,
+    status: r.status, createdAt: r.created_at, reviewedAt: r.reviewed_at,
+    userName: r.user_name, userEmail: r.user_email,
+  };
+}
+
+function requireLogin(req, res, next) {
+  if (!AUTH_ENABLED) return res.status(503).json({ error: 'auth_disabled' });
+  return requireUser(req, res, next);
+}
+
+function requireAccountAdmin(req, res, next) {
+  if (!isAccountAdmin(req.user)) return res.status(403).json({ error: 'forbidden' });
+  next();
+}
+
+app.use('/api/suggestions', requireLogin);
+
+// Período e limite atuais
+app.get('/api/suggestions/config', async (req, res) => {
+  try {
+    res.json(await getSuggestionsConfig());
+  } catch (err) {
+    console.error('suggestions config error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin: define período e limite
+app.put('/api/suggestions/config', requireAccountAdmin, async (req, res) => {
+  const { max, start, end } = req.body || {};
+  const n = Number(max);
+  if (!Number.isInteger(n) || n < 1 || n > 50) return res.status(400).json({ error: 'invalid_max' });
+  if (!isDate(start) || !isDate(end) || start > end) return res.status(400).json({ error: 'invalid_dates' });
+  try {
+    await pool.query(
+      `INSERT INTO app_data (key, value, updated_at) VALUES ('suggestions_config', $1, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = NOW()`,
+      [JSON.stringify({ max: n, start, end })]);
+    res.json(await getSuggestionsConfig());
+  } catch (err) {
+    console.error('suggestions config save error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Minhas sugestões
+app.get('/api/suggestions/mine', async (req, res) => {
+  try {
+    const cfg = await getSuggestionsConfig();
+    const r = await pool.query(
+      'SELECT * FROM song_suggestions WHERE user_id = $1 ORDER BY created_at DESC', [req.user.id]);
+    const used = r.rows.filter(row => cfg.round && row.round === cfg.round).length;
+    res.json({ config: cfg, used, items: r.rows.map(suggestionRow) });
+  } catch (err) {
+    console.error('suggestions mine error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Enviar sugestão
+app.post('/api/suggestions', async (req, res) => {
+  const { url, musica, artista, verbo } = req.body || {};
+  const videoId = parseYoutubeId(url);
+  const nome = String(musica || '').trim().slice(0, 200);
+  const cantor = String(artista || '').trim().slice(0, 200);
+  if (!videoId) return res.status(400).json({ error: 'invalid_url' });
+  if (!nome || !cantor) return res.status(400).json({ error: 'missing_fields' });
+  if (typeof verbo !== 'boolean') return res.status(400).json({ error: 'missing_verbo' });
+  let cfg;
+  try {
+    cfg = await getSuggestionsConfig();
+  } catch (err) {
+    console.error('suggestions config error:', err.message);
+    return res.status(500).json({ error: 'Database error' });
+  }
+  if (!cfg.open) return res.status(409).json({ error: 'closed' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    // Serializa os envios do mesmo usuário (evita passar do limite com cliques duplos)
+    await client.query('SELECT pg_advisory_xact_lock(hashtext($1))', [req.user.id]);
+    const mine = await client.query('SELECT video_id, round FROM song_suggestions WHERE user_id = $1', [req.user.id]);
+    if (mine.rows.filter(r => r.round === cfg.round).length >= cfg.max) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'limit_reached' });
+    }
+    if (mine.rows.some(r => r.video_id === videoId)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({ error: 'duplicate' });
+    }
+    const m = req.user.user_metadata || {};
+    const ins = await client.query(
+      `INSERT INTO song_suggestions (user_id, user_email, user_name, musica, artista, video_id, verbo, round)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [req.user.id, req.user.email, m.full_name || m.name || null, nome, cantor, videoId, verbo, cfg.round]);
+    await client.query('COMMIT');
+    res.json(suggestionRow(ins.rows[0]));
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('suggestion create error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  } finally {
+    client.release();
+  }
+});
+
+// Retirar uma sugestão própria que ainda está em análise
+app.delete('/api/suggestions/:id', async (req, res) => {
+  try {
+    const r = await pool.query(
+      "DELETE FROM song_suggestions WHERE id = $1 AND user_id = $2 AND status = 'pending' RETURNING id",
+      [Number(req.params.id) || 0, req.user.id]);
+    if (!r.rows.length) return res.status(404).json({ error: 'not_found' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('suggestion delete error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin: todas as sugestões (pendentes primeiro)
+app.get('/api/suggestions', requireAccountAdmin, async (req, res) => {
+  try {
+    const r = await pool.query(
+      `SELECT * FROM song_suggestions
+       ORDER BY (status = 'pending') DESC, created_at DESC LIMIT 300`);
+    res.json({ items: r.rows.map(suggestionRow) });
+  } catch (err) {
+    console.error('suggestions list error:', err.message);
+    res.status(500).json({ error: 'Database error' });
+  }
+});
+
+// Admin: aprovar / recusar
+app.post('/api/suggestions/:id/status', requireAccountAdmin, async (req, res) => {
+  const { status } = req.body || {};
+  if (!['approved', 'rejected', 'pending'].includes(status)) {
+    return res.status(400).json({ error: 'invalid_status' });
+  }
+  try {
+    const r = await pool.query(
+      `UPDATE song_suggestions SET status = $1, reviewed_at = NOW(), reviewed_by = $2
+       WHERE id = $3 RETURNING *`,
+      [status, req.user.email, Number(req.params.id) || 0]);
+    if (!r.rows.length) return res.status(404).json({ error: 'not_found' });
+    res.json(suggestionRow(r.rows[0]));
+  } catch (err) {
+    console.error('suggestion status error:', err.message);
     res.status(500).json({ error: 'Database error' });
   }
 });

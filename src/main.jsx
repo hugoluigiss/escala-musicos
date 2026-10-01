@@ -2,6 +2,7 @@ import { StrictMode, useState, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import Repertorio from './Repertorio.jsx'
 import Conferencia from './Conferencia.jsx'
+import Sugestoes from './Sugestoes.jsx'
 import Login from './Login.jsx'
 import { isAdmin as checkIsAdmin } from './api.js'
 import { useAuth, getAccount } from './auth.js'
@@ -47,6 +48,9 @@ function App() {
 
   if (wantsConferencia && admin) {
     return <Conferencia />;
+  }
+  if (page === "/sugestoes" || page === "/sugestoes/") {
+    return <Sugestoes />;
   }
   return <Repertorio />;
 }
